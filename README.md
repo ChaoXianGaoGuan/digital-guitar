@@ -2,6 +2,8 @@
 
 一个基于浏览器的虚拟吉他指板工具，用于建立"音名 ↔ 音高 ↔ 指板位置"的三角关系，帮助吉他学习者从"六线谱翻译机"进阶到能够独立改编歌曲。
 
+在线使用：[https://chaoxianggaoguan.github.io/digital-guitar/](https://chaoxianggaoguan.github.io/digital-guitar/)
+
 ---
 
 ## 功能概览

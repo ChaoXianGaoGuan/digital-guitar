@@ -11,6 +11,7 @@ import type {
   FretRange,
   IntervalCurriculum,
   IntervalId,
+  SamePitchCurriculum,
   ChordQuality,
   PitchDirection,
   PositionSearchRange,
@@ -28,6 +29,7 @@ import {
   checkPitchDirectionAnswer,
   checkPositionAnswer,
   checkPositionSetAnswer,
+  checkSamePitchMatchingAnswer,
   generateQuestion
 } from '../utils/practice';
 import type { Tuning } from '../utils/tuning';
@@ -59,12 +61,14 @@ interface PracticeState {
   positionSearchRange: PositionSearchRange;
   chordCurriculum: ChordCurriculum;
   intervalCurriculum: IntervalCurriculum;
+  samePitchCurriculum: SamePitchCurriculum;
   correctAnswer: CorrectAnswer | null;
   selectedNote: NoteName | null;
   selectedPosition: FretboardPosition | null;
   selectedChord: Chord | null;
   selectedChordPositions: FretboardPosition[];
   selectedNotePositions: FretboardPosition[];
+  selectedCandidatePosition: FretboardPosition | null;
 }
 
 type PracticeAction =
@@ -75,6 +79,7 @@ type PracticeAction =
   | { type: 'set-position-search-range'; range: PositionSearchRange; question: PracticeQuestion }
   | { type: 'set-curriculum'; curriculum: ChordCurriculum; question?: PracticeQuestion }
   | { type: 'set-interval-curriculum'; curriculum: IntervalCurriculum; question?: PracticeQuestion }
+  | { type: 'set-same-pitch-curriculum'; curriculum: SamePitchCurriculum; question?: PracticeQuestion }
   | { type: 'select-note'; note: NoteName }
   | { type: 'select-position'; position: FretboardPosition }
   | { type: 'select-chord'; chord: Chord }
@@ -82,6 +87,8 @@ type PracticeAction =
   | { type: 'toggle-note-position'; position: FretboardPosition }
   | { type: 'clear-chord-positions' }
   | { type: 'clear-note-positions' }
+  | { type: 'toggle-candidate-position'; position: FretboardPosition }
+  | { type: 'clear-candidate-position' }
   | { type: 'submit-result'; isCorrect: boolean; answer: CorrectAnswer };
 
 const INITIAL_STATE: PracticeState = {
@@ -94,12 +101,14 @@ const INITIAL_STATE: PracticeState = {
   positionSearchRange: '1st',
   chordCurriculum: 'beginner',
   intervalCurriculum: 'beginner',
+  samePitchCurriculum: 'beginner',
   correctAnswer: null,
   selectedNote: null,
   selectedPosition: null,
   selectedChord: null,
   selectedChordPositions: [],
-  selectedNotePositions: []
+  selectedNotePositions: [],
+  selectedCandidatePosition: null
 };
 
 function withNewQuestion(state: PracticeState, question: PracticeQuestion): PracticeState {
@@ -112,7 +121,8 @@ function withNewQuestion(state: PracticeState, question: PracticeQuestion): Prac
     selectedPosition: null,
     selectedChord: null,
     selectedChordPositions: [],
-    selectedNotePositions: []
+    selectedNotePositions: [],
+    selectedCandidatePosition: null
   };
 }
 
@@ -134,7 +144,8 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
         fretRange: state.fretRange,
         positionSearchRange: state.positionSearchRange,
         chordCurriculum: state.chordCurriculum,
-        intervalCurriculum: state.intervalCurriculum
+        intervalCurriculum: state.intervalCurriculum,
+        samePitchCurriculum: state.samePitchCurriculum
       };
     case 'new-question':
       return withNewQuestion(state, action.question);
@@ -152,6 +163,10 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
       return action.question
         ? withNewQuestion({ ...state, intervalCurriculum: action.curriculum }, action.question)
         : { ...state, intervalCurriculum: action.curriculum };
+    case 'set-same-pitch-curriculum':
+      return action.question
+        ? withNewQuestion({ ...state, samePitchCurriculum: action.curriculum }, action.question)
+        : { ...state, samePitchCurriculum: action.curriculum };
     case 'select-note':
       return state.feedback === 'none' ? { ...state, selectedNote: action.note } : state;
     case 'select-position':
@@ -193,6 +208,17 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
       return state.feedback === 'none' ? { ...state, selectedChordPositions: [] } : state;
     case 'clear-note-positions':
       return state.feedback === 'none' ? { ...state, selectedNotePositions: [] } : state;
+    case 'toggle-candidate-position':
+      if (state.feedback !== 'none') return state;
+      return {
+        ...state,
+        selectedCandidatePosition: state.selectedCandidatePosition?.string === action.position.string
+          && state.selectedCandidatePosition.fret === action.position.fret
+          ? null
+          : action.position
+      };
+    case 'clear-candidate-position':
+      return state.feedback === 'none' ? { ...state, selectedCandidatePosition: null } : state;
     case 'submit-result':
       if (state.feedback !== 'none') return state;
       return {
@@ -211,6 +237,7 @@ function getQuestionPrompt(question: PracticeQuestion): string {
   if (question.type === 'pitch-direction') return '高低比较';
   if (question.type === 'interval-identification') return '音程听辨';
   if (question.type === 'chord-quality') return '大三 / 小三和弦辨别';
+  if (question.type === 'same-pitch-matching') return `MIDI ${question.targetMidi}`;
   if (question.chord) return question.chord.name;
   if (question.midiNote !== undefined) return `MIDI ${question.midiNote}`;
   if (question.correctNoteName) return question.correctNoteName;
@@ -222,6 +249,7 @@ function getCorrectAnswerText(question: PracticeQuestion): string {
     ?? question.correctNoteName
     ?? question.correctPitchDirection
     ?? question.correctInterval
+    ?? (question.targetMidi !== undefined ? `MIDI ${question.targetMidi}` : undefined)
     ?? '';
 }
 
@@ -244,11 +272,13 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     type: PracticeType,
     range = state.fretRange,
     curriculum = state.chordCurriculum,
-    intervalCurriculum = state.intervalCurriculum
-  ) => generateQuestion(type, tuning, range, curriculum, intervalCurriculum), [
+    intervalCurriculum = state.intervalCurriculum,
+    samePitchCurriculum = state.samePitchCurriculum
+  ) => generateQuestion(type, tuning, range, curriculum, intervalCurriculum, samePitchCurriculum), [
     state.fretRange,
     state.chordCurriculum,
     state.intervalCurriculum,
+    state.samePitchCurriculum,
     tuning
   ]);
 
@@ -310,11 +340,13 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       isCorrect,
       currentQuestion.type === 'interval-identification'
         ? `interval-identification:${state.intervalCurriculum}`
-        : currentQuestion.type
+        : currentQuestion.type === 'same-pitch-matching'
+          ? `same-pitch-matching:${state.samePitchCurriculum}`
+          : currentQuestion.type
     );
     dispatch({ type: 'submit-result', isCorrect, answer });
     if (isCorrect) scheduleNextQuestion();
-  }, [recordAnswer, scheduleNextQuestion, state.intervalCurriculum]);
+  }, [recordAnswer, scheduleNextQuestion, state.intervalCurriculum, state.samePitchCurriculum]);
 
   const setFretRange = useCallback((range: FretRange) => {
     cancelScheduledQuestion();
@@ -328,7 +360,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             tuning,
             range,
             state.chordCurriculum,
-            state.intervalCurriculum
+            state.intervalCurriculum,
+            state.samePitchCurriculum
           )
         : undefined
     });
@@ -337,6 +370,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.practiceType,
     state.chordCurriculum,
     state.intervalCurriculum,
+    state.samePitchCurriculum,
     tuning
   ]);
 
@@ -362,7 +396,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             tuning,
             state.fretRange,
             curriculum,
-            state.intervalCurriculum
+            state.intervalCurriculum,
+            state.samePitchCurriculum
           )
         : undefined
     });
@@ -371,6 +406,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.practiceType,
     state.fretRange,
     state.intervalCurriculum,
+    state.samePitchCurriculum,
     tuning
   ]);
 
@@ -386,6 +422,33 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             tuning,
             state.fretRange,
             state.chordCurriculum,
+            curriculum,
+            state.samePitchCurriculum
+          )
+        : undefined
+    });
+  }, [
+    cancelScheduledQuestion,
+    state.practiceType,
+    state.fretRange,
+    state.chordCurriculum,
+    state.samePitchCurriculum,
+    tuning
+  ]);
+
+  const setSamePitchCurriculum = useCallback((curriculum: SamePitchCurriculum) => {
+    cancelScheduledQuestion();
+    canSubmitRef.current = state.practiceType !== null;
+    dispatch({
+      type: 'set-same-pitch-curriculum',
+      curriculum,
+      question: state.practiceType
+        ? generateQuestion(
+            state.practiceType,
+            tuning,
+            state.fretRange,
+            state.chordCurriculum,
+            state.intervalCurriculum,
             curriculum
           )
         : undefined
@@ -395,6 +458,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.practiceType,
     state.fretRange,
     state.chordCurriculum,
+    state.intervalCurriculum,
     tuning
   ]);
 
@@ -453,6 +517,27 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       { position: question.correctPosition }
     );
   }, [state.feedback, state.question, state.practiceType, tuning, handleResult]);
+
+  const submitSamePitchMatch = useCallback((position = state.selectedCandidatePosition) => {
+    const question = state.question;
+    if (
+      state.feedback !== 'none'
+      || question?.targetMidi === undefined
+      || state.practiceType !== 'same-pitch-matching'
+    ) return;
+    handleResult(
+      checkSamePitchMatchingAnswer(position, question.targetMidi, tuning),
+      question,
+      { position: question.correctPosition }
+    );
+  }, [
+    state.feedback,
+    state.question,
+    state.practiceType,
+    state.selectedCandidatePosition,
+    tuning,
+    handleResult
+  ]);
 
   const submitNoteAndPosition = useCallback((
     name: NoteName,
@@ -607,6 +692,15 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       return true;
     }
 
+    if (state.practiceType === 'same-pitch-matching') {
+      const isCandidate = state.question?.candidatePositions?.some(position => (
+        position.string === click.position.string && position.fret === click.position.fret
+      ));
+      if (!isCandidate) return false;
+      dispatch({ type: 'toggle-candidate-position', position: click.position });
+      return true;
+    }
+
     if (state.practiceType === 'chord-to-position') {
       dispatch({ type: 'toggle-chord-position', position: click.position });
       return true;
@@ -621,6 +715,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
   }, [
     state.feedback,
     state.practiceType,
+    state.question?.candidatePositions,
     state.selectedNote,
     submitNoteAndPosition,
     submitReferencePosition
@@ -634,31 +729,43 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     dispatch({ type: 'clear-note-positions' });
   }, []);
 
-  const highlightedPositions = useMemo(() => {
+  const fretHighlights = useMemo(() => {
     const question = state.question;
     if (!question) return [];
+    if (state.practiceType === 'same-pitch-matching') {
+      return [
+        ...(question.candidatePositions ?? []).map(position => ({ position, tone: 'prompt' as const })),
+        ...(state.selectedCandidatePosition
+          ? [{ position: state.selectedCandidatePosition, tone: 'selected' as const }]
+          : []),
+        ...(state.feedback === 'wrong' && state.correctAnswer?.position
+          ? [{ position: state.correctAnswer.position, tone: 'correct' as const }]
+          : [])
+      ];
+    }
     if (state.feedback === 'wrong') {
-      return state.correctAnswer?.positions
+      const positions = state.correctAnswer?.positions
         ?? state.correctAnswer?.chordPositions
         ?? (state.correctAnswer?.position ? [state.correctAnswer.position] : []);
+      return positions.map(position => ({ position, tone: 'correct' as const }));
     }
     if (state.practiceType === 'position-to-name' && question.correctPosition) {
-      return [question.correctPosition];
+      return [{ position: question.correctPosition, tone: 'prompt' as const }];
     }
     if (state.practiceType === 'position-to-chord') {
-      return question.correctChordPositions ?? [];
+      return (question.correctChordPositions ?? []).map(position => ({ position, tone: 'prompt' as const }));
     }
     if (state.practiceType === 'chord-to-position') {
-      return state.selectedChordPositions;
+      return state.selectedChordPositions.map(position => ({ position, tone: 'selected' as const }));
     }
     if (state.practiceType === 'note-name-to-all-positions') {
-      return state.selectedNotePositions;
+      return state.selectedNotePositions.map(position => ({ position, tone: 'selected' as const }));
     }
     if (state.practiceType === 'note-to-name-and-position' && state.selectedPosition) {
-      return [state.selectedPosition];
+      return [{ position: state.selectedPosition, tone: 'selected' as const }];
     }
     if (state.practiceType === 'reference-pitch-to-position' && state.selectedPosition) {
-      return [state.selectedPosition];
+      return [{ position: state.selectedPosition, tone: 'selected' as const }];
     }
     return [];
   }, [
@@ -668,7 +775,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.practiceType,
     state.selectedChordPositions,
     state.selectedNotePositions,
-    state.selectedPosition
+    state.selectedPosition,
+    state.selectedCandidatePosition
   ]);
 
   const playbackMidiNotes = useMemo(() => {
@@ -676,6 +784,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     if (
       (state.practiceType === 'note-to-name-and-position'
         || state.practiceType === 'position-to-name'
+        || state.practiceType === 'same-pitch-matching'
         || state.practiceType === 'reference-pitch-to-position')
       && state.question.midiNote !== undefined
     ) {
@@ -707,9 +816,15 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     return 'note';
   }, [state.practiceType]);
 
+  const highlightedPositions = useMemo(
+    () => fretHighlights.map(highlight => highlight.position),
+    [fretHighlights]
+  );
+
   return {
     ...state,
     summary,
+    fretHighlights,
     highlightedPositions,
     playbackMidiNotes,
     playbackKind,
@@ -719,11 +834,13 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     setPositionSearchRange,
     setChordCurriculum,
     setIntervalCurriculum,
+    setSamePitchCurriculum,
     selectNote,
     selectChord,
     handleFretboardClick,
     clearChordPositions,
     clearNotePositions,
+    clearCandidatePosition: () => dispatch({ type: 'clear-candidate-position' }),
     submitNoteAndPosition,
     submitNoteName,
     submitChordPositions,
@@ -732,6 +849,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     submitPitchDirection,
     submitInterval,
     submitChordQuality,
+    submitSamePitchMatch,
     nextQuestion,
     clearSummary
   };

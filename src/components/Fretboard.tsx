@@ -5,13 +5,16 @@ import type { Tuning } from '../utils/tuning';
 import { FretCell } from './FretCell';
 
 export type HighlightTone = 'selected' | 'prompt' | 'correct';
+export interface FretHighlight {
+  position: FretboardPosition;
+  tone: HighlightTone;
+}
 
 interface FretboardProps {
   tuning: Tuning;
   showNoteNames: boolean;
   noteDisplayMode: 'natural' | 'octave';
-  highlightedPositions?: FretboardPosition[];
-  highlightTone?: HighlightTone;
+  highlights?: FretHighlight[];
   showClickFeedback?: boolean;
   onPositionClick: (click: FretClick) => void;
 }
@@ -20,8 +23,7 @@ export function Fretboard({
   tuning,
   showNoteNames,
   noteDisplayMode,
-  highlightedPositions = [],
-  highlightTone = 'selected',
+  highlights = [],
   showClickFeedback = true,
   onPositionClick
 }: FretboardProps) {
@@ -33,15 +35,22 @@ export function Fretboard({
   ));
   const markerFrets = [3, 5, 7, 9, 12, 15];
 
-  const isHighlighted = (string: StringIndex, fret: number) => (
-    highlightedPositions.some(position => position.string === string && position.fret === fret)
-  );
+  const getHighlightTone = (string: StringIndex, fret: number) => {
+    const tones = highlights
+      .filter(highlight => highlight.position.string === string && highlight.position.fret === fret)
+      .map(highlight => highlight.tone);
+    if (tones.includes('correct')) return 'correct';
+    if (tones.includes('selected')) return 'selected';
+    if (tones.includes('prompt')) return 'prompt';
+    return undefined;
+  };
 
   return (
     <div className="fretboard-wrapper">
       <div className="open-strings">
         {displayStrings.map((midiNote, displayIndex) => {
           const stringIndex = (strings - 1 - displayIndex) as StringIndex;
+          const tone = getHighlightTone(stringIndex, 0);
           return (
             <FretCell
               key={`open-${stringIndex}`}
@@ -50,8 +59,8 @@ export function Fretboard({
               variant="open"
               showNoteName={showNoteNames}
               noteDisplayMode={noteDisplayMode}
-              isHighlighted={isHighlighted(stringIndex, 0)}
-              highlightTone={highlightTone}
+              isHighlighted={tone !== undefined}
+              highlightTone={tone}
               showClickFeedback={showClickFeedback}
               style={{
                 top: `${(displayIndex / (strings - 1)) * 100}%`,
@@ -101,6 +110,7 @@ export function Fretboard({
               {Array.from({ length: frets }, (_, fretIndex) => {
                 const fret = fretIndex + 1;
                 const midiNote = openMidi + fret;
+                const tone = getHighlightTone(stringIndex, fret);
                 return (
                   <FretCell
                     key={`${stringIndex}-${fret}`}
@@ -109,8 +119,8 @@ export function Fretboard({
                     variant="fretted"
                     showNoteName={showNoteNames}
                     noteDisplayMode={noteDisplayMode}
-                    isHighlighted={isHighlighted(stringIndex, fret)}
-                    highlightTone={highlightTone}
+                    isHighlighted={tone !== undefined}
+                    highlightTone={tone}
                     showClickFeedback={showClickFeedback}
                     style={{
                       width: `${fretPositions[fret] - fretPositions[fret - 1]}%`

@@ -62,6 +62,11 @@ describe('practice summary', () => {
       correct: 0,
       wrong: 0
     });
+    expect(loadPracticeSummary().byType['same-pitch-matching']).toEqual({
+      total: 0,
+      correct: 0,
+      wrong: 0
+    });
     expect(loadPracticeSummary().recentResults).toEqual({});
   });
 
@@ -93,5 +98,20 @@ describe('practice summary', () => {
     });
     expect(result.current.summary.recentResults['interval-identification:beginner']).toEqual([true]);
     expect(result.current.summary.recentResults['interval-identification:advanced']).toBeUndefined();
+  });
+
+  it('stores same-pitch curriculum progress separately', () => {
+    const { result } = renderHook(() => usePracticeSummary());
+    act(() => {
+      result.current.recordAnswer(
+        'same-pitch-matching',
+        'MIDI 40',
+        'MIDI 40',
+        true,
+        'same-pitch-matching:beginner'
+      );
+    });
+    expect(result.current.summary.recentResults['same-pitch-matching:beginner']).toEqual([true]);
+    expect(result.current.summary.recentResults['same-pitch-matching:advanced']).toBeUndefined();
   });
 });

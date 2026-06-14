@@ -6,12 +6,14 @@ import {
   checkChordQualityAnswer,
   checkIntervalAnswer,
   checkPitchDirectionAnswer,
+  checkSamePitchMatchingAnswer,
   generateChordQualityQuestion,
   generateIntervalQuestion,
   generatePitchDirectionQuestion,
-  generateReferencePitchQuestion
+  generateReferencePitchQuestion,
+  generateSamePitchMatchingQuestion
 } from '../utils/practice';
-import { OPEN_G_TUNING, STANDARD_TUNING } from '../utils/tuning';
+import { createCustomTuning, OPEN_G_TUNING, STANDARD_TUNING } from '../utils/tuning';
 
 describe('ear training question generators', () => {
   it('keeps pitch comparison notes inside C3-B4 and labels their direction', () => {
@@ -40,6 +42,49 @@ describe('ear training question generators', () => {
         OPEN_G_TUNING.strings[question.correctPosition!.string] + question.correctPosition!.fret
       );
     }
+  });
+
+  it('builds three unique same-pitch candidates with exactly one correct MIDI', () => {
+    for (const tuning of [
+      STANDARD_TUNING,
+      OPEN_G_TUNING,
+      createCustomTuning([41, 46, 51, 56, 60, 65])
+    ]) {
+      for (const [range, min, max] of [
+        ['all', 0, 15],
+        ['1st', 0, 4],
+        ['2nd', 5, 8],
+        ['3rd', 9, 12]
+      ] as const) {
+        const question = generateSamePitchMatchingQuestion(tuning, range, 'beginner');
+        const candidates = question.candidatePositions!;
+        expect(candidates).toHaveLength(3);
+        expect(new Set(candidates.map(position => `${position.string}:${position.fret}`)).size).toBe(3);
+        expect(new Set(candidates.map(position => tuning.strings[position.string] + position.fret)).size).toBe(3);
+        expect(candidates.every(position => position.fret >= min && position.fret <= max)).toBe(true);
+        expect(candidates.filter(position => (
+          tuning.strings[position.string] + position.fret === question.targetMidi
+        ))).toHaveLength(1);
+      }
+    }
+  });
+
+  it('prefers far beginner distractors and near advanced distractors', () => {
+    for (let index = 0; index < 100; index++) {
+      const beginner = generateSamePitchMatchingQuestion(STANDARD_TUNING, 'all', 'beginner');
+      const advanced = generateSamePitchMatchingQuestion(STANDARD_TUNING, 'all', 'advanced');
+      const distances = (question: typeof beginner) => question.candidatePositions!
+        .map(position => Math.abs(STANDARD_TUNING.strings[position.string] + position.fret - question.targetMidi!))
+        .filter(distance => distance !== 0);
+      expect(distances(beginner).every(distance => distance >= 5)).toBe(true);
+      expect(distances(advanced).every(distance => distance >= 1 && distance <= 3)).toBe(true);
+    }
+  });
+
+  it('checks same-pitch matches by exact MIDI rather than note name', () => {
+    expect(checkSamePitchMatchingAnswer({ string: 0, fret: 0 }, 40, STANDARD_TUNING)).toBe(true);
+    expect(checkSamePitchMatchingAnswer({ string: 0, fret: 12 }, 40, STANDARD_TUNING)).toBe(false);
+    expect(checkSamePitchMatchingAnswer(null, 40, STANDARD_TUNING)).toBe(false);
   });
 
   it('limits beginner intervals to six ascending choices', () => {

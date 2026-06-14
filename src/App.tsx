@@ -75,14 +75,7 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
           tuning={settings.tuning}
           showNoteNames={settings.showNoteNames}
           noteDisplayMode={settings.noteDisplayMode}
-          highlightedPositions={isPracticeMode ? practice.highlightedPositions : []}
-          highlightTone={
-            practice.feedback === 'wrong'
-              ? 'correct'
-              : practice.practiceType === 'position-to-chord'
-                ? 'prompt'
-                : 'selected'
-          }
+          highlights={isPracticeMode ? practice.fretHighlights : []}
           showClickFeedback={!isPracticeMode}
           onPositionClick={handlePositionClick}
         />

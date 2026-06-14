@@ -13,6 +13,7 @@ export type PracticeType =
   | 'position-to-chord'
   | 'listen-to-chord'
   | 'pitch-direction'
+  | 'same-pitch-matching'
   | 'reference-pitch-to-position'
   | 'interval-identification'
   | 'chord-quality';
@@ -28,6 +29,7 @@ export type IntervalId =
   | 'perfect5'
   | 'octave';
 export type IntervalCurriculum = 'beginner' | 'advanced';
+export type SamePitchCurriculum = 'beginner' | 'advanced';
 export type PlaybackDirection = 'ascending' | 'descending';
 export type ChordQuality = 'major' | 'minor';
 
@@ -37,14 +39,14 @@ export type PracticeFeedback = 'none' | 'correct' | 'wrong';
 
 export const FRET_RANGE_NAMES: Record<FretRange, string> = {
   all: '全部',
-  '1st': '第一把位 (1-4品)',
+  '1st': '第一把位 (空弦、1-4品)',
   '2nd': '第二把位 (5-8品)',
   '3rd': '第三把位 (9-12品)'
 };
 
 export const FRET_RANGES: Record<FretRange, { min: number; max: number }> = {
-  all: { min: 1, max: 15 },
-  '1st': { min: 1, max: 4 },
+  all: { min: 0, max: 15 },
+  '1st': { min: 0, max: 4 },
   '2nd': { min: 5, max: 8 },
   '3rd': { min: 9, max: 12 }
 };
@@ -57,7 +59,8 @@ export const PRACTICE_TYPE_NAMES: Record<PracticeType, string> = {
   'position-to-chord': '指板按和弦 → 和弦名',
   'listen-to-chord': '听和弦 → 和弦名',
   'pitch-direction': '高低比较',
-  'reference-pitch-to-position': '参照音 → 指板位置',
+  'same-pitch-matching': '同音匹配 → 指板位置',
+  'reference-pitch-to-position': '听音高 → 指板自由定位',
   'interval-identification': '音程听辨',
   'chord-quality': '大三 / 小三和弦辨别'
 };
@@ -110,6 +113,8 @@ export interface PracticeQuestion {
   intervalDirection?: PlaybackDirection;
   correctChordQuality?: ChordQuality;
   playbackMidiNotes?: number[];
+  targetMidi?: number;
+  candidatePositions?: FretboardPosition[];
 }
 
 export function getPositionsForNoteName(
@@ -118,11 +123,10 @@ export function getPositionsForNoteName(
   range: PositionSearchRange
 ): FretboardPosition[] {
   const fretRange = FRET_RANGES[range];
-  const minFret = range === '1st' ? 0 : fretRange.min;
   const positions: FretboardPosition[] = [];
 
   for (let string = 0; string < 6; string++) {
-    for (let fret = minFret; fret <= fretRange.max; fret++) {
+    for (let fret = fretRange.min; fret <= fretRange.max; fret++) {
       if (midiToChromaticName(tuning.strings[string] + fret) === noteName) {
         positions.push({ string: string as StringIndex, fret });
       }
@@ -182,11 +186,7 @@ export function generatePitchDirectionQuestion(): PracticeQuestion {
 }
 
 function getFretRangeWithOpenStrings(range: FretRange): { min: number; max: number } {
-  return range === 'all'
-    ? { min: 0, max: 15 }
-    : range === '1st'
-      ? { min: 0, max: 4 }
-      : FRET_RANGES[range];
+  return FRET_RANGES[range];
 }
 
 export function generateReferencePitchQuestion(
@@ -203,6 +203,71 @@ export function generateReferencePitchQuestion(
     midiNote: midi,
     correctMidiNote: midi,
     correctPosition: { string, fret }
+  };
+}
+
+function getPositionsForFretRange(
+  tuning: Tuning,
+  range: FretRange
+): Array<FretboardPosition & { midi: number }> {
+  const fretRange = getFretRangeWithOpenStrings(range);
+  const positions: Array<FretboardPosition & { midi: number }> = [];
+  for (let string = 0; string < 6; string++) {
+    for (let fret = fretRange.min; fret <= fretRange.max; fret++) {
+      positions.push({
+        string: string as StringIndex,
+        fret,
+        midi: tuning.strings[string] + fret
+      });
+    }
+  }
+  return positions;
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+export function generateSamePitchMatchingQuestion(
+  tuning: Tuning,
+  range: FretRange,
+  curriculum: SamePitchCurriculum
+): PracticeQuestion {
+  const positions = getPositionsForFretRange(tuning, range);
+  const target = randomItem(positions);
+  const distractors = positions.filter(position => (
+    position.midi !== target.midi
+    && (position.string !== target.string || position.fret !== target.fret)
+  ));
+  const preferred = distractors.filter(position => {
+    const distance = Math.abs(position.midi - target.midi);
+    return curriculum === 'beginner' ? distance >= 5 : distance >= 1 && distance <= 3;
+  });
+  const fallback = distractors.filter(position => !preferred.includes(position));
+  const selectedDistractors = [...shuffled(preferred), ...shuffled(fallback)]
+    .reduce<typeof distractors>((selected, position) => (
+      selected.length < 2 && !selected.some(candidate => candidate.midi === position.midi)
+        ? [...selected, position]
+        : selected
+    ), []);
+  const correctPosition = { string: target.string, fret: target.fret };
+
+  return {
+    id: ++questionIdCounter,
+    type: 'same-pitch-matching',
+    targetMidi: target.midi,
+    midiNote: target.midi,
+    correctMidiNote: target.midi,
+    correctPosition,
+    candidatePositions: shuffled([
+      correctPosition,
+      ...selectedDistractors.map(({ string, fret }) => ({ string, fret }))
+    ])
   };
 }
 
@@ -316,7 +381,8 @@ export function generateQuestion(
   tuning: Tuning = STANDARD_TUNING,
   fretRange: FretRange = 'all',
   curriculum: ChordCurriculum = 'beginner',
-  intervalCurriculum: IntervalCurriculum = 'beginner'
+  intervalCurriculum: IntervalCurriculum = 'beginner',
+  samePitchCurriculum: SamePitchCurriculum = 'beginner'
 ): PracticeQuestion {
   switch (type) {
     case 'note-to-name-and-position':
@@ -333,6 +399,8 @@ export function generateQuestion(
       return generateChordQuestion(type, curriculum);
     case 'pitch-direction':
       return generatePitchDirectionQuestion();
+    case 'same-pitch-matching':
+      return generateSamePitchMatchingQuestion(tuning, fretRange, samePitchCurriculum);
     case 'reference-pitch-to-position':
       return generateReferencePitchQuestion(tuning, fretRange);
     case 'interval-identification':
@@ -340,6 +408,14 @@ export function generateQuestion(
     case 'chord-quality':
       return generateChordQualityQuestion();
   }
+}
+
+export function checkSamePitchMatchingAnswer(
+  selected: FretboardPosition | null,
+  targetMidi: number,
+  tuning: Tuning
+): boolean {
+  return selected !== null && tuning.strings[selected.string] + selected.fret === targetMidi;
 }
 
 export function checkPitchDirectionAnswer(

@@ -9,6 +9,7 @@ import type {
   FretRange,
   IntervalCurriculum,
   IntervalId,
+  SamePitchCurriculum,
   PitchDirection,
   PositionSearchRange,
   PracticeType
@@ -73,6 +74,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     positionSearchRange,
     chordCurriculum,
     intervalCurriculum,
+    samePitchCurriculum,
     correctAnswer,
     summary,
     selectedNote,
@@ -80,6 +82,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     selectedChord,
     selectedChordPositions,
     selectedNotePositions,
+    selectedCandidatePosition,
     playbackMidiNotes,
     playbackKind,
     startPractice,
@@ -87,15 +90,18 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     setPositionSearchRange,
     setChordCurriculum,
     setIntervalCurriculum,
+    setSamePitchCurriculum,
     selectNote,
     selectChord,
     clearChordPositions,
     clearNotePositions,
+    clearCandidatePosition,
     submitChordPositions,
     submitNotePositions,
     submitPitchDirection,
     submitInterval,
     submitChordQuality,
+    submitSamePitchMatch,
     nextQuestion,
     clearSummary
   } = practice;
@@ -158,6 +164,8 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
               {PRACTICE_CATALOG.filter(entry => entry.category === category).map(entry => {
                 const progressKey = entry.type === 'interval-identification'
                   ? 'interval-identification:beginner'
+                  : entry.type === 'same-pitch-matching'
+                    ? 'same-pitch-matching:beginner'
                   : entry.type;
                 const mastery = getPracticeMastery(summary, progressKey);
                 return (
@@ -195,7 +203,19 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
       case 'pitch-direction':
         return <><p>听两个音，判断第二个音相对第一个音的高低。</p>{renderReplayButton()}</>;
       case 'reference-pitch-to-position':
-        return <><p>听参照音，在指板上点击任意一个相同音高的位置。</p>{renderReplayButton()}</>;
+        return <><p>听目标音，在指板上自由点击任意一个相同 MIDI 音高的位置。</p>{renderReplayButton()}</>;
+      case 'same-pitch-matching':
+        return (
+          <>
+            <p>听目标音，再试听三个候选亮点，选择音高完全相同的位置。</p>
+            {renderReplayButton()}
+            <p>{selectedCandidatePosition ? `已选：${formatPosition(selectedCandidatePosition)}` : '尚未选择候选位置'}</p>
+            <div className="inline-actions">
+              <button type="button" onClick={clearCandidatePosition}>清除选择</button>
+              <button type="button" className="submit-answer" onClick={() => submitSamePitchMatch()}>提交答案</button>
+            </div>
+          </>
+        );
       case 'interval-identification':
         return (
           <>
@@ -298,6 +318,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
 
       {(practiceType === 'position-to-name'
         || practiceType === 'note-to-name-and-position'
+        || practiceType === 'same-pitch-matching'
         || practiceType === 'reference-pitch-to-position') && (
         <div className="practice-mode-switcher">
           <label htmlFor="fret-range">练习范围：</label>
@@ -322,6 +343,16 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
         <div className="practice-mode-switcher">
           <label htmlFor="interval-curriculum">音程级别：</label>
           <select id="interval-curriculum" value={intervalCurriculum} onChange={event => setIntervalCurriculum(event.target.value as IntervalCurriculum)}>
+            <option value="beginner">入门</option>
+            <option value="advanced">进阶</option>
+          </select>
+        </div>
+      )}
+
+      {practiceType === 'same-pitch-matching' && (
+        <div className="practice-mode-switcher">
+          <label htmlFor="same-pitch-curriculum">同音匹配级别：</label>
+          <select id="same-pitch-curriculum" value={samePitchCurriculum} onChange={event => setSamePitchCurriculum(event.target.value as SamePitchCurriculum)}>
             <option value="beginner">入门</option>
             <option value="advanced">进阶</option>
           </select>

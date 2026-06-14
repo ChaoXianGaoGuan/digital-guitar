@@ -243,13 +243,15 @@ type PracticeType =
   | 'position-to-chord'           // 指板按和弦 → 和弦名
   | 'listen-to-chord'             // 听和弦 → 和弦名
   | 'pitch-direction'             // 高低比较
-  | 'reference-pitch-to-position' // 参照音 → 指板位置
+  | 'same-pitch-matching'         // 同音匹配 → 指板位置
+  | 'reference-pitch-to-position' // 听音高 → 指板自由定位
   | 'interval-identification'     // 音程听辨
   | 'chord-quality'               // 大三 / 小三和弦辨别
 
 type PitchDirection = 'higher' | 'same' | 'lower'
 type IntervalId = 'unison' | 'minor2' | 'major2' | 'minor3' | 'major3' | 'perfect4' | 'perfect5' | 'octave'
 type IntervalCurriculum = 'beginner' | 'advanced'
+type SamePitchCurriculum = 'beginner' | 'advanced'
 type PlaybackDirection = 'ascending' | 'descending'
 
 type FretRange = 'all' | '1st' | '2nd' | '3rd'
@@ -279,6 +281,8 @@ interface PracticeQuestion {
   intervalDirection?: PlaybackDirection;
   correctChordQuality?: 'major' | 'minor';
   playbackMidiNotes?: number[];   // 同时播放的和弦性质题音符
+  targetMidi?: number;            // 同音匹配的目标音高
+  candidatePositions?: { string: number; fret: number }[]; // 三个候选亮点
 }
 
 interface PracticeStats {
@@ -300,20 +304,20 @@ PRACTICE_TYPE_NAMES: Record<PracticeType, string>
 
 FRET_RANGE_NAMES: Record<FretRange, string>
 // 'all': '全部'
-// '1st': '第一把位 (1-4品)'
+// '1st': '第一把位 (空弦、1-4品)'
 // '2nd': '第二把位 (5-8品)'
 // '3rd': '第三把位 (9-12品)'
 
 FRET_RANGES: Record<FretRange, { min: number; max: number }>
 // 'all': { min: 1, max: 15 }
-// '1st': { min: 1, max: 4 }
+// '1st': { min: 0, max: 4 }
 // '2nd': { min: 5, max: 8 }
 // '3rd': { min: 9, max: 12 }
 ```
 
 ### 函数
 
-#### `generateQuestion(type, tuning?, fretRange?, chordCurriculum?, intervalCurriculum?): PracticeQuestion`
+#### `generateQuestion(type, tuning?, fretRange?, chordCurriculum?, intervalCurriculum?, samePitchCurriculum?): PracticeQuestion`
 
 生成练习题目。根据类型分发到音符题目或和弦题目生成。
 
@@ -349,6 +353,14 @@ checkPositionAnswer({ string: 5, fret: 2 }, 65, STANDARD_TUNING) // false (1弦2
 #### `checkPositionSetAnswer(selected: FretboardPosition[], correct: FretboardPosition[]): boolean`
 
 验证用户是否找全全部同名位置。顺序无关，数量和位置集合必须完全一致。
+
+#### `generateSamePitchMatchingQuestion(tuning: Tuning, range: FretRange, curriculum: SamePitchCurriculum): PracticeQuestion`
+
+生成同音匹配题：一个目标音高、一个正确位置和两个干扰位置。入门级优先使用距离较大的干扰音，进阶级优先使用相差 1-3 个半音的干扰音。
+
+#### `checkSamePitchMatchingAnswer(selected: FretboardPosition | null, targetMidi: number, tuning: Tuning): boolean`
+
+验证候选位置是否产生与目标完全相同的 MIDI 音高。同音名不同八度不算正确。
 
 #### `checkChordNameAnswer(userAnswer: string, correctAnswer: string): boolean`
 

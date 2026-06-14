@@ -49,7 +49,8 @@ describe('PracticeMode', () => {
     expect(screen.getByRole('button', { name: '听音高 → 音名 + 指板位置' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '听和弦 → 和弦名' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '高低比较' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '参照音 → 指板位置' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '同音匹配 → 指板位置' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '听音高 → 指板自由定位' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '音程听辨' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '大三 / 小三和弦辨别' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '指板亮点 → 音名' })).toBeEnabled();
@@ -78,5 +79,17 @@ describe('PracticeMode', () => {
     fireEvent.click(screen.getByRole('button', { name: '高低比较' }));
     expect(screen.getByRole('group', { name: '练耳训练' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重新听音' })).toBeInTheDocument();
+  });
+
+  it('shows the controls for the same-pitch matching bridge exercise', () => {
+    render(<Harness status="ready" />);
+    fireEvent.click(screen.getByRole('button', { name: '同音匹配 → 指板位置' }));
+
+    expect(screen.getByText('听目标音，再试听三个候选亮点，选择音高完全相同的位置。')).toBeInTheDocument();
+    expect(screen.getByLabelText('练习范围：')).toHaveValue('all');
+    expect(screen.getByLabelText('同音匹配级别：')).toHaveValue('beginner');
+    expect(screen.getByRole('button', { name: '重新听音' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '清除选择' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '提交答案' })).toBeInTheDocument();
   });
 });

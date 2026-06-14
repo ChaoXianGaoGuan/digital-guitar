@@ -34,6 +34,7 @@ export const PRACTICE_TYPES: PracticeType[] = [
   'position-to-chord',
   'listen-to-chord',
   'pitch-direction',
+  'same-pitch-matching',
   'reference-pitch-to-position',
   'interval-identification',
   'chord-quality'
@@ -53,6 +54,7 @@ export function createEmptySummary(): PracticeSummary {
       'position-to-chord': createEmptyEntry(),
       'listen-to-chord': createEmptyEntry(),
       'pitch-direction': createEmptyEntry(),
+      'same-pitch-matching': createEmptyEntry(),
       'reference-pitch-to-position': createEmptyEntry(),
       'interval-identification': createEmptyEntry(),
       'chord-quality': createEmptyEntry()

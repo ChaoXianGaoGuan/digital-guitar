@@ -307,6 +307,67 @@ describe('usePractice', () => {
     expect(wrong.result.current.feedback).toBe('wrong');
   });
 
+  it('allows auditioning only same-pitch candidates and submits manually', () => {
+    const { result } = renderHook(() => usePractice());
+    act(() => result.current.startPractice('same-pitch-matching'));
+    const question = result.current.question!;
+    const correct = question.candidatePositions!.find(position => (
+      STANDARD_TUNING.strings[position.string] + position.fret === question.targetMidi
+    ))!;
+    const nonCandidate = { string: 5 as const, fret: 15 };
+
+    let handled = true;
+    act(() => {
+      handled = result.current.handleFretboardClick({
+        position: nonCandidate,
+        midi: STANDARD_TUNING.strings[nonCandidate.string] + nonCandidate.fret
+      });
+    });
+    expect(handled).toBe(false);
+    expect(result.current.selectedCandidatePosition).toBeNull();
+
+    act(() => {
+      handled = result.current.handleFretboardClick({
+        position: correct,
+        midi: STANDARD_TUNING.strings[correct.string] + correct.fret
+      });
+    });
+    expect(handled).toBe(true);
+    expect(result.current.stats.total).toBe(0);
+    expect(result.current.selectedCandidatePosition).toEqual(correct);
+
+    act(() => result.current.submitSamePitchMatch());
+    expect(result.current.stats).toEqual({ total: 1, correct: 1 });
+  });
+
+  it('toggles a same-pitch candidate and highlights the correct answer after a mistake', () => {
+    const { result } = renderHook(() => usePractice());
+    act(() => result.current.startPractice('same-pitch-matching'));
+    const question = result.current.question!;
+    const wrong = question.candidatePositions!.find(position => (
+      STANDARD_TUNING.strings[position.string] + position.fret !== question.targetMidi
+    ))!;
+
+    act(() => {
+      result.current.handleFretboardClick({
+        position: wrong,
+        midi: STANDARD_TUNING.strings[wrong.string] + wrong.fret
+      });
+      result.current.handleFretboardClick({
+        position: wrong,
+        midi: STANDARD_TUNING.strings[wrong.string] + wrong.fret
+      });
+    });
+    expect(result.current.selectedCandidatePosition).toBeNull();
+
+    act(() => result.current.submitSamePitchMatch(wrong));
+    expect(result.current.feedback).toBe('wrong');
+    expect(result.current.fretHighlights).toContainEqual({
+      position: question.correctPosition,
+      tone: 'correct'
+    });
+  });
+
   it('scores pitch direction, intervals and chord quality only once', () => {
     const direction = renderHook(() => usePractice());
     act(() => direction.result.current.startPractice('pitch-direction'));

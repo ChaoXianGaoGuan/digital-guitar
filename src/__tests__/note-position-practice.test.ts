@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   checkPositionSetAnswer,
   generateQuestion,
@@ -41,5 +41,13 @@ describe('note-name to all fretboard positions', () => {
     const question = generateQuestion('note-name-to-all-positions', STANDARD_TUNING, '1st');
     expect(['C', 'D', 'E', 'F', 'G', 'A', 'B']).toContain(question.correctNoteName);
     expect(question.correctPositions?.length).toBeGreaterThan(0);
+  });
+
+  it('includes open strings in regular first-position note questions', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const question = generateQuestion('position-to-name', STANDARD_TUNING, '1st');
+    expect(question.correctPosition).toEqual({ string: 0, fret: 0 });
+    expect(question.correctMidiNote).toBe(STANDARD_TUNING.strings[0]);
+    randomSpy.mockRestore();
   });
 });

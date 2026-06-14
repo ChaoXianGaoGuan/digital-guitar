@@ -32,7 +32,10 @@ describe('Fretboard', () => {
         tuning={STANDARD_TUNING}
         showNoteNames={false}
         noteDisplayMode="natural"
-        highlightedPositions={[{ string: 0, fret: 0 }, { string: 5, fret: 1 }]}
+        highlights={[
+          { position: { string: 0, fret: 0 }, tone: 'selected' },
+          { position: { string: 5, fret: 1 }, tone: 'selected' }
+        ]}
         onPositionClick={() => undefined}
       />
     );
@@ -109,8 +112,7 @@ describe('Fretboard', () => {
         tuning={STANDARD_TUNING}
         showNoteNames={false}
         noteDisplayMode="natural"
-        highlightedPositions={[{ string: 0, fret: 0 }]}
-        highlightTone="prompt"
+        highlights={[{ position: { string: 0, fret: 0 }, tone: 'prompt' }]}
         onPositionClick={() => undefined}
       />
     );
@@ -122,11 +124,28 @@ describe('Fretboard', () => {
         tuning={STANDARD_TUNING}
         showNoteNames={false}
         noteDisplayMode="natural"
-        highlightedPositions={[{ string: 0, fret: 0 }]}
-        highlightTone="correct"
+        highlights={[{ position: { string: 0, fret: 0 }, tone: 'correct' }]}
         onPositionClick={() => undefined}
       />
     );
     expect(openString.querySelector('.red-dot')).toHaveClass('dot-correct');
+  });
+
+  it('uses correct over selected over prompt when highlights overlap', () => {
+    render(
+      <Fretboard
+        tuning={STANDARD_TUNING}
+        showNoteNames={false}
+        noteDisplayMode="natural"
+        highlights={[
+          { position: { string: 0, fret: 0 }, tone: 'prompt' },
+          { position: { string: 0, fret: 0 }, tone: 'selected' },
+          { position: { string: 0, fret: 0 }, tone: 'correct' }
+        ]}
+        onPositionClick={() => undefined}
+      />
+    );
+    expect(screen.getByRole('button', { name: '6弦 空弦 E' }).querySelector('.red-dot'))
+      .toHaveClass('dot-correct');
   });
 });

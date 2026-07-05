@@ -34,6 +34,15 @@ export function Fretboard({
     (1 - (2 ** (-fret / 12))) / (1 - (2 ** (-frets / 12))) * 100
   ));
   const markerFrets = [3, 5, 7, 9, 12, 15];
+  const areaPositions = highlights
+    .filter(highlight => highlight.tone === 'area')
+    .map(highlight => highlight.position);
+  const areaRange = areaPositions.length > 0
+    ? {
+        min: Math.max(0, Math.min(...areaPositions.map(position => position.fret))),
+        max: Math.min(frets, Math.max(...areaPositions.map(position => position.fret)))
+      }
+    : null;
 
   const getHighlightTone = (string: StringIndex, fret: number) => {
     const tones = highlights
@@ -42,7 +51,6 @@ export function Fretboard({
     if (tones.includes('correct')) return 'correct';
     if (tones.includes('selected')) return 'selected';
     if (tones.includes('prompt')) return 'prompt';
-    if (tones.includes('area')) return 'area';
     return undefined;
   };
 
@@ -74,6 +82,18 @@ export function Fretboard({
       </div>
 
       <div className="fretboard">
+        {areaRange && (
+          <div
+            className="fret-area-frame"
+            aria-hidden="true"
+            data-fret-start={areaRange.min}
+            data-fret-end={areaRange.max}
+            style={{
+              left: `${fretPositions[areaRange.min === 0 ? 0 : areaRange.min - 1]}%`,
+              width: `${fretPositions[areaRange.max] - fretPositions[areaRange.min === 0 ? 0 : areaRange.min - 1]}%`
+            }}
+          />
+        )}
         <div className="fret-nut" />
         {Array.from({ length: frets + 1 }, (_, fretIndex) => (
           <div

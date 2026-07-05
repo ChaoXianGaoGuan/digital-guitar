@@ -357,7 +357,20 @@ main {
 }
 
 .highlight-area {
-  background: rgba(255, 246, 217, 0.22);
+  background: transparent;
+}
+
+.fret-area-frame {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  z-index: 7;
+  border: 3px solid rgba(248, 213, 107, 0.92);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(83, 57, 24, 0.3),
+    0 0 18px rgba(248, 213, 107, 0.18);
+  pointer-events: none;
 }
 
 .string-segment:focus-visible,

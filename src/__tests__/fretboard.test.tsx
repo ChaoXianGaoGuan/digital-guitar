@@ -148,4 +148,27 @@ describe('Fretboard', () => {
     expect(screen.getByRole('button', { name: '6弦 空弦 E' }).querySelector('.red-dot'))
       .toHaveClass('dot-correct');
   });
+
+  it('renders area highlights as a fretboard frame instead of cell dots', () => {
+    const { container } = render(
+      <Fretboard
+        tuning={STANDARD_TUNING}
+        showNoteNames={false}
+        noteDisplayMode="natural"
+        highlights={[
+          { position: { string: 0, fret: 1 }, tone: 'area' },
+          { position: { string: 5, fret: 4 }, tone: 'area' },
+          { position: { string: 2, fret: 3 }, tone: 'prompt' }
+        ]}
+        onPositionClick={() => undefined}
+      />
+    );
+
+    const frame = container.querySelector('.fret-area-frame');
+    expect(frame).toBeInTheDocument();
+    expect(frame).toHaveAttribute('data-fret-start', '1');
+    expect(frame).toHaveAttribute('data-fret-end', '4');
+    expect(screen.getByRole('button', { name: '6弦 1品 F' })).not.toHaveClass('highlighted');
+    expect(screen.getByRole('button', { name: '4弦 3品 F' })).toHaveClass('highlighted');
+  });
 });

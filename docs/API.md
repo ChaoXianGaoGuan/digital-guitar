@@ -250,7 +250,7 @@ MAJOR_SCALE_PATTERN_NAMES: Record<MajorScalePatternId, string>
 
 #### `getMajorScalePattern(key: MajorKey, patternId: MajorScalePatternId): MajorScalePattern`
 
-在标准调弦下生成 Mi/Sol/La/Ti/Re 指型区域，返回起止品位与区域内所有调内音位置。
+在标准调弦下按 `56 / 712 / 345 / 671 / 234` 级数循环生成 Mi/Sol/La/Ti/Re 指型形状，返回起止品位与形状内所有调内音位置。Mi 型从六弦空弦音开始。
 
 #### `generateMajorScalePatternQuestionData(key, patternId): MajorScalePatternQuestionData`
 

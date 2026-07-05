@@ -27,6 +27,67 @@ describe('major scale pattern note-name practice', () => {
     }
   });
 
+  it('uses the five-pattern degree cycle instead of rectangular scale scanning', () => {
+    expect(getMajorScalePattern('C', 'mi').positions).toEqual([
+      { string: 0, fret: 0 },
+      { string: 0, fret: 1 },
+      { string: 0, fret: 3 },
+      { string: 1, fret: 0 },
+      { string: 1, fret: 2 },
+      { string: 1, fret: 3 },
+      { string: 2, fret: 0 },
+      { string: 2, fret: 2 },
+      { string: 2, fret: 3 },
+      { string: 3, fret: 0 },
+      { string: 3, fret: 2 },
+      { string: 4, fret: 0 },
+      { string: 4, fret: 1 },
+      { string: 4, fret: 3 },
+      { string: 5, fret: 0 },
+      { string: 5, fret: 1 },
+      { string: 5, fret: 3 }
+    ]);
+
+    expect(getMajorScalePattern('C', 'sol').positions).toEqual([
+      { string: 0, fret: 3 },
+      { string: 0, fret: 5 },
+      { string: 1, fret: 2 },
+      { string: 1, fret: 3 },
+      { string: 1, fret: 5 },
+      { string: 2, fret: 2 },
+      { string: 2, fret: 3 },
+      { string: 2, fret: 5 },
+      { string: 3, fret: 2 },
+      { string: 3, fret: 4 },
+      { string: 3, fret: 5 },
+      { string: 4, fret: 3 },
+      { string: 4, fret: 5 },
+      { string: 4, fret: 6 },
+      { string: 5, fret: 3 },
+      { string: 5, fret: 5 }
+    ]);
+
+    expect(getMajorScalePattern('C', 'la').positions).toEqual([
+      { string: 0, fret: 5 },
+      { string: 0, fret: 7 },
+      { string: 0, fret: 8 },
+      { string: 1, fret: 5 },
+      { string: 1, fret: 7 },
+      { string: 1, fret: 8 },
+      { string: 2, fret: 5 },
+      { string: 2, fret: 7 },
+      { string: 3, fret: 4 },
+      { string: 3, fret: 5 },
+      { string: 3, fret: 7 },
+      { string: 4, fret: 5 },
+      { string: 4, fret: 6 },
+      { string: 4, fret: 8 },
+      { string: 5, fret: 5 },
+      { string: 5, fret: 7 },
+      { string: 5, fret: 8 }
+    ]);
+  });
+
   it('only chooses target positions from the selected key and pattern area', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const question = generateQuestion(

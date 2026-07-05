@@ -76,12 +76,22 @@ export const MAJOR_SCALE_PATTERN_NAMES: Record<MajorScalePatternId, string> = {
 export const MAJOR_SCALE_PATTERNS: MajorScalePatternId[] = ['mi', 'sol', 'la', 'ti', 're'];
 
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
-const PATTERN_ANCHOR_DEGREES: Record<MajorScalePatternId, number> = {
+type ScaleDegree = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+const DEGREE_GROUPS: ScaleDegree[][] = [
+  [5, 6],
+  [7, 1, 2],
+  [3, 4, 5],
+  [6, 7, 1],
+  [2, 3, 4]
+];
+
+const PATTERN_START_GROUP_INDEX: Record<MajorScalePatternId, number> = {
   mi: 2,
-  sol: 4,
-  la: 5,
-  ti: 6,
-  re: 1
+  sol: 0,
+  la: 3,
+  ti: 1,
+  re: 4
 };
 
 function normalizePitchClass(value: number): number {
@@ -91,6 +101,27 @@ function normalizePitchClass(value: number): number {
 export function getMajorScalePitchClasses(key: MajorKey): number[] {
   const root = KEY_ROOT_PITCH_CLASS[key];
   return MAJOR_SCALE_INTERVALS.map(interval => normalizePitchClass(root + interval));
+}
+
+function getPitchClassForDegree(key: MajorKey, degree: ScaleDegree): number {
+  return getMajorScalePitchClasses(key)[degree - 1];
+}
+
+function getClosestFretForPitchClass(
+  openMidi: number,
+  targetPitchClass: number,
+  anchorFret: number
+): number {
+  const candidates: number[] = [];
+  for (let fret = 0; fret <= 15; fret++) {
+    if (normalizePitchClass(openMidi + fret) === targetPitchClass) {
+      candidates.push(fret);
+    }
+  }
+
+  return candidates.reduce((best, fret) => (
+    Math.abs(fret - anchorFret) < Math.abs(best - anchorFret) ? fret : best
+  ), candidates[0]);
 }
 
 export function getScaleNoteNameForMidi(key: MajorKey, midi: number): string {
@@ -103,29 +134,36 @@ export function getMajorScalePattern(
   key: MajorKey,
   patternId: MajorScalePatternId
 ): MajorScalePattern {
-  const scalePitchClasses = new Set(getMajorScalePitchClasses(key));
-  const rootPitchClass = KEY_ROOT_PITCH_CLASS[key];
-  const anchorDegree = PATTERN_ANCHOR_DEGREES[patternId];
-  const anchorPitchClass = normalizePitchClass(rootPitchClass + MAJOR_SCALE_INTERVALS[anchorDegree]);
-  const sixthStringPitchClass = normalizePitchClass(STANDARD_TUNING.strings[0]);
-  const startFret = normalizePitchClass(anchorPitchClass - sixthStringPitchClass);
-  const endFret = Math.min(15, startFret + 4);
+  const startGroupIndex = PATTERN_START_GROUP_INDEX[patternId];
+  const sixthStringGroup = DEGREE_GROUPS[startGroupIndex];
+  const anchorPitchClass = getPitchClassForDegree(key, sixthStringGroup[0]);
+  const anchorFret = getClosestFretForPitchClass(
+    STANDARD_TUNING.strings[0],
+    anchorPitchClass,
+    0
+  );
   const positions: FretboardPosition[] = [];
 
   for (let string = 0; string < 6; string++) {
-    for (let fret = startFret; fret <= endFret; fret++) {
-      const midi = STANDARD_TUNING.strings[string] + fret;
-      if (scalePitchClasses.has(normalizePitchClass(midi))) {
-        positions.push({ string: string as StringIndex, fret });
-      }
+    const degreeGroup = DEGREE_GROUPS[(startGroupIndex + string) % DEGREE_GROUPS.length];
+    for (const degree of degreeGroup) {
+      positions.push({
+        string: string as StringIndex,
+        fret: getClosestFretForPitchClass(
+          STANDARD_TUNING.strings[string],
+          getPitchClassForDegree(key, degree),
+          anchorFret
+        )
+      });
     }
   }
+  const frets = positions.map(position => position.fret);
 
   return {
     id: patternId,
     name: MAJOR_SCALE_PATTERN_NAMES[patternId],
-    startFret,
-    endFret,
+    startFret: Math.min(...frets),
+    endFret: Math.max(...frets),
     positions
   };
 }

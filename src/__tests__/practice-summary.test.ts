@@ -114,4 +114,19 @@ describe('practice summary', () => {
     expect(result.current.summary.recentResults['same-pitch-matching:beginner']).toEqual([true]);
     expect(result.current.summary.recentResults['same-pitch-matching:advanced']).toBeUndefined();
   });
+
+  it('migrates summaries with the major-scale pattern practice type', () => {
+    localStorage.setItem('digital-guitar-practice-summary-v1', JSON.stringify({
+      byType: {
+        'position-to-name': { total: 3, correct: 2, wrong: 1 }
+      }
+    }));
+
+    const summary = loadPracticeSummary();
+    expect(summary.byType['major-scale-pattern-note-name']).toEqual({
+      total: 0,
+      correct: 0,
+      wrong: 0
+    });
+  });
 });

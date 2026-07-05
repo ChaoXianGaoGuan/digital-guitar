@@ -11,7 +11,7 @@ interface FretCellProps {
   showNoteName: boolean;
   noteDisplayMode: 'natural' | 'octave';
   isHighlighted?: boolean;
-  highlightTone?: 'selected' | 'prompt' | 'correct';
+  highlightTone?: 'selected' | 'prompt' | 'correct' | 'area';
   showClickFeedback?: boolean;
   style?: CSSProperties;
   onClick: (click: FretClick) => void;
@@ -34,7 +34,7 @@ export function FretCell({
   const noteName = noteDisplayMode === 'octave'
     ? midiToFullNoteName(midi)
     : midiToChromaticName(midi);
-  const showDot = isHighlighted || clickedDot;
+  const showDot = (isHighlighted && highlightTone !== 'area') || clickedDot;
 
   useEffect(() => () => {
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);

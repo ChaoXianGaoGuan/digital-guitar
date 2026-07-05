@@ -30,6 +30,13 @@ import {
 } from '../utils/practiceCatalog';
 import type { Tuning } from '../utils/tuning';
 import { isStandardTuning } from '../utils/tuning';
+import type { MajorKey, MajorScalePatternId } from '../utils/majorScalePattern';
+import {
+  MAJOR_KEYS,
+  MAJOR_KEY_SCALE_NOTES,
+  MAJOR_SCALE_PATTERNS,
+  MAJOR_SCALE_PATTERN_NAMES
+} from '../utils/majorScalePattern';
 import { ChordButtons } from './ChordButtons';
 import { LearningRecord } from './LearningRecord';
 import { NoteButtons } from './NoteButtons';
@@ -46,6 +53,10 @@ function isChordPractice(type: PracticeType): boolean {
   return type === 'chord-to-position'
     || type === 'position-to-chord'
     || type === 'listen-to-chord';
+}
+
+function requiresStandardTuning(type: PracticeType): boolean {
+  return isChordPractice(type) || type === 'major-scale-pattern-note-name';
 }
 
 function formatPosition(position: FretboardPosition): string {
@@ -75,6 +86,8 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     chordCurriculum,
     intervalCurriculum,
     samePitchCurriculum,
+    majorKey,
+    scalePatternId,
     correctAnswer,
     summary,
     selectedNote,
@@ -91,6 +104,8 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     setChordCurriculum,
     setIntervalCurriculum,
     setSamePitchCurriculum,
+    setMajorKey,
+    setScalePattern,
     selectNote,
     selectChord,
     clearChordPositions,
@@ -102,6 +117,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
     submitInterval,
     submitChordQuality,
     submitSamePitchMatch,
+    submitMajorScalePatternNoteName,
     nextQuestion,
     clearSummary
   } = practice;
@@ -133,7 +149,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
   ]);
 
   const isTypeDisabled = (type: PracticeType) => (
-    (isChordPractice(type) && !supportsChordPractice)
+    (requiresStandardTuning(type) && !supportsChordPractice)
       || (practiceRequiresAudio(type) && audioStatus !== 'ready')
   );
 
@@ -155,7 +171,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
             <span>{recommended.label}</span>
           </div>
         )}
-        {!supportsChordPractice && <p className="practice-notice">和弦练习目前仅支持标准调弦。</p>}
+        {!supportsChordPractice && <p className="practice-notice">和弦练习与大调指型练习目前仅支持标准调弦。</p>}
         {audioStatus !== 'ready' && <p className="practice-notice">音频尚未就绪，听音练习暂不可用。</p>}
         {PRACTICE_CATEGORIES.map(category => (
           <section className="practice-category" key={category}>
@@ -253,6 +269,19 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
               <button type="button" onClick={clearNotePositions}>清除选择</button>
               <button type="button" className="submit-answer" onClick={() => submitNotePositions()}>提交答案</button>
             </div>
+          </>
+        );
+      case 'major-scale-pattern-note-name':
+        return (
+          <>
+            <p>
+              当前为 <strong>{majorKey} 大调</strong> · <strong>{MAJOR_SCALE_PATTERN_NAMES[scalePatternId]}</strong>。
+              指板浅色区域是该指型，蓝色亮点是本题目标音。
+            </p>
+            <p>请选择这个位置在 {majorKey} 大调里的音名。</p>
+            {question.scalePattern && (
+              <p className="hint">覆盖品位：{question.scalePattern.startFret} - {question.scalePattern.endFret} 品</p>
+            )}
           </>
         );
       case 'chord-to-position':
@@ -359,6 +388,25 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
         </div>
       )}
 
+      {practiceType === 'major-scale-pattern-note-name' && (
+        <>
+          <div className="practice-mode-switcher">
+            <label htmlFor="major-key">大调：</label>
+            <select id="major-key" value={majorKey} onChange={event => setMajorKey(event.target.value as MajorKey)}>
+              {MAJOR_KEYS.map(key => <option key={key} value={key}>{key} 大调</option>)}
+            </select>
+          </div>
+          <div className="practice-mode-switcher">
+            <label htmlFor="scale-pattern">指型：</label>
+            <select id="scale-pattern" value={scalePatternId} onChange={event => setScalePattern(event.target.value as MajorScalePatternId)}>
+              {MAJOR_SCALE_PATTERNS.map(patternId => (
+                <option key={patternId} value={patternId}>{MAJOR_SCALE_PATTERN_NAMES[patternId]}</option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
       {isChordPractice(practiceType) && (
         <div className="practice-mode-switcher">
           <label htmlFor="chord-curriculum">和弦题库：</label>
@@ -379,6 +427,23 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
         {(practiceType === 'note-to-name-and-position' || practiceType === 'position-to-name') && (
           <NoteButtons onSelect={selectNote} disabled={feedback !== 'none'} selectedNote={selectedNote} />
         )}
+        {practiceType === 'major-scale-pattern-note-name' && (
+          <div className="note-buttons">
+            <div className="button-grid">
+              {MAJOR_KEY_SCALE_NOTES[majorKey].map(noteName => (
+                <button
+                  type="button"
+                  key={noteName}
+                  className="note-button"
+                  disabled={feedback !== 'none'}
+                  onClick={() => submitMajorScalePatternNoteName(noteName)}
+                >
+                  {noteName}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {(practiceType === 'position-to-chord' || practiceType === 'listen-to-chord') && (
           <ChordButtons onSelect={selectChord} disabled={feedback !== 'none'} selectedChord={selectedChord} />
         )}
@@ -390,6 +455,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
         <div className="feedback wrong">
           <p>错误！</p>
           {correctAnswer?.noteName && <p>正确答案：{correctAnswer.noteName}</p>}
+          {correctAnswer?.scaleNoteName && <p>正确答案：{correctAnswer.scaleNoteName}</p>}
           {correctAnswer?.chordName && <p>正确答案：{correctAnswer.chordName}</p>}
           {correctAnswer?.pitchDirection && <p>正确答案：{{ higher: '更高', same: '相同', lower: '更低' }[correctAnswer.pitchDirection]}</p>}
           {correctAnswer?.interval && <p>正确答案：{INTERVAL_NAMES[correctAnswer.interval]}</p>}

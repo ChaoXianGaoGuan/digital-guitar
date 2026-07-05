@@ -7,6 +7,7 @@ import type {
 import { formatChordFingering, getFingeringMidiNotes } from '../utils/chord';
 import type { FretClick } from '../utils/fretboard';
 import type { NoteName } from '../utils/note';
+import type { MajorKey, MajorScalePatternId } from '../utils/majorScalePattern';
 import type {
   FretRange,
   IntervalCurriculum,
@@ -25,6 +26,7 @@ import {
   checkChordPositionAnswer,
   checkChordQualityAnswer,
   checkIntervalAnswer,
+  checkMajorScalePatternNoteAnswer,
   checkNoteNameAnswer,
   checkPitchDirectionAnswer,
   checkPositionAnswer,
@@ -38,6 +40,7 @@ import { usePracticeSummary } from './usePracticeSummary';
 
 export interface CorrectAnswer {
   noteName?: NoteName;
+  scaleNoteName?: string;
   position?: FretboardPosition;
   positions?: FretboardPosition[];
   selectedPositions?: FretboardPosition[];
@@ -62,6 +65,8 @@ interface PracticeState {
   chordCurriculum: ChordCurriculum;
   intervalCurriculum: IntervalCurriculum;
   samePitchCurriculum: SamePitchCurriculum;
+  majorKey: MajorKey;
+  scalePatternId: MajorScalePatternId;
   correctAnswer: CorrectAnswer | null;
   selectedNote: NoteName | null;
   selectedPosition: FretboardPosition | null;
@@ -80,6 +85,8 @@ type PracticeAction =
   | { type: 'set-curriculum'; curriculum: ChordCurriculum; question?: PracticeQuestion }
   | { type: 'set-interval-curriculum'; curriculum: IntervalCurriculum; question?: PracticeQuestion }
   | { type: 'set-same-pitch-curriculum'; curriculum: SamePitchCurriculum; question?: PracticeQuestion }
+  | { type: 'set-major-key'; majorKey: MajorKey; question?: PracticeQuestion }
+  | { type: 'set-scale-pattern'; patternId: MajorScalePatternId; question?: PracticeQuestion }
   | { type: 'select-note'; note: NoteName }
   | { type: 'select-position'; position: FretboardPosition }
   | { type: 'select-chord'; chord: Chord }
@@ -102,6 +109,8 @@ const INITIAL_STATE: PracticeState = {
   chordCurriculum: 'beginner',
   intervalCurriculum: 'beginner',
   samePitchCurriculum: 'beginner',
+  majorKey: 'C',
+  scalePatternId: 'mi',
   correctAnswer: null,
   selectedNote: null,
   selectedPosition: null,
@@ -145,7 +154,9 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
         positionSearchRange: state.positionSearchRange,
         chordCurriculum: state.chordCurriculum,
         intervalCurriculum: state.intervalCurriculum,
-        samePitchCurriculum: state.samePitchCurriculum
+        samePitchCurriculum: state.samePitchCurriculum,
+        majorKey: state.majorKey,
+        scalePatternId: state.scalePatternId
       };
     case 'new-question':
       return withNewQuestion(state, action.question);
@@ -167,6 +178,14 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
       return action.question
         ? withNewQuestion({ ...state, samePitchCurriculum: action.curriculum }, action.question)
         : { ...state, samePitchCurriculum: action.curriculum };
+    case 'set-major-key':
+      return action.question
+        ? withNewQuestion({ ...state, majorKey: action.majorKey }, action.question)
+        : { ...state, majorKey: action.majorKey };
+    case 'set-scale-pattern':
+      return action.question
+        ? withNewQuestion({ ...state, scalePatternId: action.patternId }, action.question)
+        : { ...state, scalePatternId: action.patternId };
     case 'select-note':
       return state.feedback === 'none' ? { ...state, selectedNote: action.note } : state;
     case 'select-position':
@@ -238,6 +257,9 @@ function getQuestionPrompt(question: PracticeQuestion): string {
   if (question.type === 'interval-identification') return '音程听辨';
   if (question.type === 'chord-quality') return '大三 / 小三和弦辨别';
   if (question.type === 'same-pitch-matching') return `MIDI ${question.targetMidi}`;
+  if (question.type === 'major-scale-pattern-note-name') {
+    return `${question.majorKey ?? ''} ${question.scalePattern?.name ?? ''}`;
+  }
   if (question.chord) return question.chord.name;
   if (question.midiNote !== undefined) return `MIDI ${question.midiNote}`;
   if (question.correctNoteName) return question.correctNoteName;
@@ -249,6 +271,7 @@ function getCorrectAnswerText(question: PracticeQuestion): string {
     ?? question.correctNoteName
     ?? question.correctPitchDirection
     ?? question.correctInterval
+    ?? question.correctScaleNoteName
     ?? (question.targetMidi !== undefined ? `MIDI ${question.targetMidi}` : undefined)
     ?? '';
 }
@@ -273,12 +296,25 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     range = state.fretRange,
     curriculum = state.chordCurriculum,
     intervalCurriculum = state.intervalCurriculum,
-    samePitchCurriculum = state.samePitchCurriculum
-  ) => generateQuestion(type, tuning, range, curriculum, intervalCurriculum, samePitchCurriculum), [
+    samePitchCurriculum = state.samePitchCurriculum,
+    majorKey = state.majorKey,
+    scalePatternId = state.scalePatternId
+  ) => generateQuestion(
+    type,
+    tuning,
+    range,
+    curriculum,
+    intervalCurriculum,
+    samePitchCurriculum,
+    majorKey,
+    scalePatternId
+  ), [
     state.fretRange,
     state.chordCurriculum,
     state.intervalCurriculum,
     state.samePitchCurriculum,
+    state.majorKey,
+    state.scalePatternId,
     tuning
   ]);
 
@@ -361,7 +397,9 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             range,
             state.chordCurriculum,
             state.intervalCurriculum,
-            state.samePitchCurriculum
+            state.samePitchCurriculum,
+            state.majorKey,
+            state.scalePatternId
           )
         : undefined
     });
@@ -371,6 +409,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.chordCurriculum,
     state.intervalCurriculum,
     state.samePitchCurriculum,
+    state.majorKey,
+    state.scalePatternId,
     tuning
   ]);
 
@@ -397,7 +437,9 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             state.fretRange,
             curriculum,
             state.intervalCurriculum,
-            state.samePitchCurriculum
+            state.samePitchCurriculum,
+            state.majorKey,
+            state.scalePatternId
           )
         : undefined
     });
@@ -407,6 +449,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.fretRange,
     state.intervalCurriculum,
     state.samePitchCurriculum,
+    state.majorKey,
+    state.scalePatternId,
     tuning
   ]);
 
@@ -423,7 +467,9 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             state.fretRange,
             state.chordCurriculum,
             curriculum,
-            state.samePitchCurriculum
+            state.samePitchCurriculum,
+            state.majorKey,
+            state.scalePatternId
           )
         : undefined
     });
@@ -433,6 +479,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.fretRange,
     state.chordCurriculum,
     state.samePitchCurriculum,
+    state.majorKey,
+    state.scalePatternId,
     tuning
   ]);
 
@@ -449,7 +497,9 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
             state.fretRange,
             state.chordCurriculum,
             state.intervalCurriculum,
-            curriculum
+            curriculum,
+            state.majorKey,
+            state.scalePatternId
           )
         : undefined
     });
@@ -459,6 +509,68 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     state.fretRange,
     state.chordCurriculum,
     state.intervalCurriculum,
+    state.majorKey,
+    state.scalePatternId,
+    tuning
+  ]);
+
+  const setMajorKey = useCallback((majorKey: MajorKey) => {
+    cancelScheduledQuestion();
+    canSubmitRef.current = state.practiceType !== null;
+    dispatch({
+      type: 'set-major-key',
+      majorKey,
+      question: state.practiceType
+        ? generateQuestion(
+            state.practiceType,
+            tuning,
+            state.fretRange,
+            state.chordCurriculum,
+            state.intervalCurriculum,
+            state.samePitchCurriculum,
+            majorKey,
+            state.scalePatternId
+          )
+        : undefined
+    });
+  }, [
+    cancelScheduledQuestion,
+    state.practiceType,
+    state.fretRange,
+    state.chordCurriculum,
+    state.intervalCurriculum,
+    state.samePitchCurriculum,
+    state.scalePatternId,
+    tuning
+  ]);
+
+  const setScalePattern = useCallback((patternId: MajorScalePatternId) => {
+    cancelScheduledQuestion();
+    canSubmitRef.current = state.practiceType !== null;
+    dispatch({
+      type: 'set-scale-pattern',
+      patternId,
+      question: state.practiceType
+        ? generateQuestion(
+            state.practiceType,
+            tuning,
+            state.fretRange,
+            state.chordCurriculum,
+            state.intervalCurriculum,
+            state.samePitchCurriculum,
+            state.majorKey,
+            patternId
+          )
+        : undefined
+    });
+  }, [
+    cancelScheduledQuestion,
+    state.practiceType,
+    state.fretRange,
+    state.chordCurriculum,
+    state.intervalCurriculum,
+    state.samePitchCurriculum,
+    state.majorKey,
     tuning
   ]);
 
@@ -571,6 +683,21 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       checkNoteNameAnswer(name, question.correctNoteName),
       question,
       { noteName: question.correctNoteName, position: question.correctPosition }
+    );
+  }, [state.feedback, state.question, state.practiceType, handleResult]);
+
+  const submitMajorScalePatternNoteName = useCallback((name: string) => {
+    const question = state.question;
+    if (
+      state.feedback !== 'none'
+      || !question?.correctScaleNoteName
+      || state.practiceType !== 'major-scale-pattern-note-name'
+    ) return;
+
+    handleResult(
+      checkMajorScalePatternNoteAnswer(name, question.correctScaleNoteName),
+      question,
+      { scaleNoteName: question.correctScaleNoteName, position: question.correctPosition }
     );
   }, [state.feedback, state.question, state.practiceType, handleResult]);
 
@@ -701,6 +828,10 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       return true;
     }
 
+    if (state.practiceType === 'major-scale-pattern-note-name') {
+      return false;
+    }
+
     if (state.practiceType === 'chord-to-position') {
       dispatch({ type: 'toggle-chord-position', position: click.position });
       return true;
@@ -738,6 +869,15 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
         ...(state.selectedCandidatePosition
           ? [{ position: state.selectedCandidatePosition, tone: 'selected' as const }]
           : []),
+        ...(state.feedback === 'wrong' && state.correctAnswer?.position
+          ? [{ position: state.correctAnswer.position, tone: 'correct' as const }]
+          : [])
+      ];
+    }
+    if (state.practiceType === 'major-scale-pattern-note-name') {
+      return [
+        ...(question.scalePatternPositions ?? []).map(position => ({ position, tone: 'area' as const })),
+        ...(question.correctPosition ? [{ position: question.correctPosition, tone: 'prompt' as const }] : []),
         ...(state.feedback === 'wrong' && state.correctAnswer?.position
           ? [{ position: state.correctAnswer.position, tone: 'correct' as const }]
           : [])
@@ -835,6 +975,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     setChordCurriculum,
     setIntervalCurriculum,
     setSamePitchCurriculum,
+    setMajorKey,
+    setScalePattern,
     selectNote,
     selectChord,
     handleFretboardClick,
@@ -850,6 +992,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     submitInterval,
     submitChordQuality,
     submitSamePitchMatch,
+    submitMajorScalePatternNoteName,
     nextQuestion,
     clearSummary
   };

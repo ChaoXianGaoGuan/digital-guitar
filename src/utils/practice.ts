@@ -4,6 +4,11 @@ import type { Chord, ChordCurriculum, ChordFingering, FretboardPosition, StringI
 import { checkChordFingeringAnswer, getChordPool, getFingeringPositions } from './chord';
 import type { Tuning } from './tuning';
 import { STANDARD_TUNING } from './tuning';
+import type { MajorKey, MajorScalePattern, MajorScalePatternId } from './majorScalePattern';
+import {
+  checkMajorScalePatternNoteAnswer,
+  generateMajorScalePatternQuestionData
+} from './majorScalePattern';
 
 export type PracticeType =
   | 'note-to-name-and-position'
@@ -16,7 +21,8 @@ export type PracticeType =
   | 'same-pitch-matching'
   | 'reference-pitch-to-position'
   | 'interval-identification'
-  | 'chord-quality';
+  | 'chord-quality'
+  | 'major-scale-pattern-note-name';
 
 export type PitchDirection = 'higher' | 'same' | 'lower';
 export type IntervalId =
@@ -62,7 +68,8 @@ export const PRACTICE_TYPE_NAMES: Record<PracticeType, string> = {
   'same-pitch-matching': '同音匹配 → 指板位置',
   'reference-pitch-to-position': '听音高 → 指板自由定位',
   'interval-identification': '音程听辨',
-  'chord-quality': '大三 / 小三和弦辨别'
+  'chord-quality': '大三 / 小三和弦辨别',
+  'major-scale-pattern-note-name': '大调指型 → 音名'
 };
 
 export const INTERVAL_NAMES: Record<IntervalId, string> = {
@@ -115,6 +122,11 @@ export interface PracticeQuestion {
   playbackMidiNotes?: number[];
   targetMidi?: number;
   candidatePositions?: FretboardPosition[];
+  majorKey?: MajorKey;
+  scalePatternId?: MajorScalePatternId;
+  scalePattern?: MajorScalePattern;
+  scalePatternPositions?: FretboardPosition[];
+  correctScaleNoteName?: string;
 }
 
 export function getPositionsForNoteName(
@@ -382,7 +394,9 @@ export function generateQuestion(
   fretRange: FretRange = 'all',
   curriculum: ChordCurriculum = 'beginner',
   intervalCurriculum: IntervalCurriculum = 'beginner',
-  samePitchCurriculum: SamePitchCurriculum = 'beginner'
+  samePitchCurriculum: SamePitchCurriculum = 'beginner',
+  majorKey: MajorKey = 'C',
+  scalePatternId: MajorScalePatternId = 'mi'
 ): PracticeQuestion {
   switch (type) {
     case 'note-to-name-and-position':
@@ -407,8 +421,23 @@ export function generateQuestion(
       return generateIntervalQuestion(intervalCurriculum);
     case 'chord-quality':
       return generateChordQualityQuestion();
+    case 'major-scale-pattern-note-name': {
+      const data = generateMajorScalePatternQuestionData(majorKey, scalePatternId);
+      return {
+        id: ++questionIdCounter,
+        type,
+        majorKey: data.key,
+        scalePatternId: data.patternId,
+        scalePattern: data.pattern,
+        scalePatternPositions: data.pattern.positions,
+        correctPosition: data.targetPosition,
+        correctScaleNoteName: data.correctNoteName
+      };
+    }
   }
 }
+
+export { checkMajorScalePatternNoteAnswer };
 
 export function checkSamePitchMatchingAnswer(
   selected: FretboardPosition | null,

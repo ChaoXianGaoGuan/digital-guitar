@@ -4,7 +4,7 @@ import type { FretClick } from '../utils/fretboard';
 import type { Tuning } from '../utils/tuning';
 import { FretCell } from './FretCell';
 
-export type HighlightTone = 'selected' | 'prompt' | 'correct';
+export type HighlightTone = 'selected' | 'prompt' | 'correct' | 'area';
 export interface FretHighlight {
   position: FretboardPosition;
   tone: HighlightTone;
@@ -42,6 +42,7 @@ export function Fretboard({
     if (tones.includes('correct')) return 'correct';
     if (tones.includes('selected')) return 'selected';
     if (tones.includes('prompt')) return 'prompt';
+    if (tones.includes('area')) return 'area';
     return undefined;
   };
 

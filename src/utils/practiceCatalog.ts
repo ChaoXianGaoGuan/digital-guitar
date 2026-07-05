@@ -20,6 +20,11 @@ export const PRACTICE_CATEGORIES: PracticeCategory[] = ['fretboard', 'ear', 'cho
 export const PRACTICE_CATALOG: PracticeCatalogEntry[] = [
   { type: 'position-to-name', category: 'fretboard', description: '根据指板亮点识别自然音名。' },
   { type: 'note-name-to-all-positions', category: 'fretboard', description: '找出当前把位内全部同名音。' },
+  {
+    type: 'major-scale-pattern-note-name',
+    category: 'fretboard',
+    description: '在 Mi/Sol/La/Ti/Re 大调指型区域内识别调内音名。'
+  },
   { type: 'pitch-direction', category: 'ear', description: '判断第二个音更高、相同或更低。' },
   { type: 'same-pitch-matching', category: 'ear', description: '试听三个候选亮点，找到与目标相同的音高。' },
   { type: 'interval-identification', category: 'ear', description: '辨别两个音之间的音程距离。' },

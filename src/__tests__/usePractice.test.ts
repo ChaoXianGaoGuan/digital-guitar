@@ -390,4 +390,45 @@ describe('usePractice', () => {
     act(() => quality.result.current.submitChordQuality(quality.result.current.question!.correctChordQuality!));
     expect(quality.result.current.stats).toEqual({ total: 1, correct: 1 });
   });
+
+  it('switches major key and scale pattern for the major-scale pattern note-name exercise', () => {
+    const { result } = renderHook(() => usePractice());
+    act(() => result.current.startPractice('major-scale-pattern-note-name'));
+    expect(result.current.majorKey).toBe('C');
+    expect(result.current.scalePatternId).toBe('mi');
+    expect(result.current.fretHighlights.some(highlight => highlight.tone === 'area')).toBe(true);
+    expect(result.current.fretHighlights).toContainEqual({
+      position: result.current.question?.correctPosition,
+      tone: 'prompt'
+    });
+
+    act(() => result.current.setMajorKey('D'));
+    expect(result.current.majorKey).toBe('D');
+    expect(result.current.question?.majorKey).toBe('D');
+
+    act(() => result.current.setScalePattern('sol'));
+    expect(result.current.scalePatternId).toBe('sol');
+    expect(result.current.question?.scalePatternId).toBe('sol');
+  });
+
+  it('scores major-scale pattern note names once and highlights the correct point after a mistake', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePractice());
+    act(() => result.current.startPractice('major-scale-pattern-note-name'));
+    const correct = result.current.question!.correctScaleNoteName!;
+    const wrong = correct === 'C' ? 'D' : 'C';
+
+    act(() => result.current.submitMajorScalePatternNoteName(wrong));
+    act(() => result.current.submitMajorScalePatternNoteName(wrong));
+    expect(result.current.stats).toEqual({ total: 1, correct: 0 });
+    expect(result.current.feedback).toBe('wrong');
+    expect(result.current.fretHighlights).toContainEqual({
+      position: result.current.question?.correctPosition,
+      tone: 'correct'
+    });
+
+    act(() => result.current.nextQuestion());
+    act(() => result.current.submitMajorScalePatternNoteName(correct));
+    expect(result.current.stats).toEqual({ total: 2, correct: 1 });
+  });
 });

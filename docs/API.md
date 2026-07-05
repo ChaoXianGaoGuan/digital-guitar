@@ -230,6 +230,38 @@ getChordNotes({ root: 'C', type: 'major', name: 'C', intervals: [0,4,7] }, 4)
 
 ---
 
+## utils/majorScalePattern.ts — 大调指型
+
+### 类型与常量
+
+```typescript
+type MajorKey = 'C' | 'G' | 'D' | 'A' | 'E' | 'B' | 'F♯' | 'D♭' | 'A♭' | 'E♭' | 'B♭' | 'F'
+type MajorScalePatternId = 'mi' | 'sol' | 'la' | 'ti' | 're'
+
+MAJOR_KEYS: MajorKey[]
+MAJOR_KEY_SCALE_NOTES: Record<MajorKey, string[]>
+MAJOR_SCALE_PATTERNS: MajorScalePatternId[]
+MAJOR_SCALE_PATTERN_NAMES: Record<MajorScalePatternId, string>
+```
+
+`MAJOR_KEY_SCALE_NOTES` 使用真实调内音名，例如 D 大调为 `D E F♯ G A B C♯`，B♭ 大调为 `B♭ C D E♭ F G A`。
+
+### 函数
+
+#### `getMajorScalePattern(key: MajorKey, patternId: MajorScalePatternId): MajorScalePattern`
+
+在标准调弦下生成 Mi/Sol/La/Ti/Re 指型区域，返回起止品位与区域内所有调内音位置。
+
+#### `generateMajorScalePatternQuestionData(key, patternId): MajorScalePatternQuestionData`
+
+从指定大调与指型区域中随机选择一个目标点，并返回其正确调内音名。
+
+#### `checkMajorScalePatternNoteAnswer(answer: string, correctAnswer: string): boolean`
+
+验证大调指型音名答案。必须与当前大调的真实调内音名完全一致。
+
+---
+
 ## utils/practice.ts — 练习题目生成与验证
 
 ### 类型
@@ -247,6 +279,7 @@ type PracticeType =
   | 'reference-pitch-to-position' // 听音高 → 指板自由定位
   | 'interval-identification'     // 音程听辨
   | 'chord-quality'               // 大三 / 小三和弦辨别
+  | 'major-scale-pattern-note-name' // 大调指型 → 音名
 
 type PitchDirection = 'higher' | 'same' | 'lower'
 type IntervalId = 'unison' | 'minor2' | 'major2' | 'minor3' | 'major3' | 'perfect4' | 'perfect5' | 'octave'
@@ -283,6 +316,10 @@ interface PracticeQuestion {
   playbackMidiNotes?: number[];   // 同时播放的和弦性质题音符
   targetMidi?: number;            // 同音匹配的目标音高
   candidatePositions?: { string: number; fret: number }[]; // 三个候选亮点
+  majorKey?: MajorKey;            // 大调指型题的大调
+  scalePatternId?: MajorScalePatternId; // Mi/Sol/La/Ti/Re
+  scalePatternPositions?: { string: number; fret: number }[]; // 指型区域
+  correctScaleNoteName?: string;  // 当前大调内的正确音名
 }
 
 interface PracticeStats {
@@ -298,6 +335,7 @@ PRACTICE_TYPE_NAMES: Record<PracticeType, string>
 // 'note-to-name-and-position': '听音高 → 音名 + 指板位置'
 // 'position-to-name': '指板亮点 → 音名'
 // 'note-name-to-all-positions': '音名 → 全部指板位置'
+// 'major-scale-pattern-note-name': '大调指型 → 音名'
 // 'chord-to-position': '和弦 → 指板位置'
 // 'position-to-chord': '指板按和弦 → 和弦名'
 // 'listen-to-chord': '听和弦 → 和弦名'
@@ -317,13 +355,15 @@ FRET_RANGES: Record<FretRange, { min: number; max: number }>
 
 ### 函数
 
-#### `generateQuestion(type, tuning?, fretRange?, chordCurriculum?, intervalCurriculum?, samePitchCurriculum?): PracticeQuestion`
+#### `generateQuestion(type, tuning?, fretRange?, chordCurriculum?, intervalCurriculum?, samePitchCurriculum?, majorKey?, scalePatternId?): PracticeQuestion`
 
 生成练习题目。根据类型分发到音符题目或和弦题目生成。
 
 - `type` — 练习类型
 - `tuning` — 调弦配置（默认 STANDARD_TUNING）
 - `fretRange` — 把位范围（默认 'all'）
+- `majorKey` — 大调指型题的大调（默认 C）
+- `scalePatternId` — 大调指型题的指型（默认 mi）
 - 返回 `PracticeQuestion`
 
 ```typescript

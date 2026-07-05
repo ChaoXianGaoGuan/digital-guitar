@@ -37,8 +37,9 @@ function Harness({
 describe('PracticeMode', () => {
   it('disables chord practice outside standard tuning', () => {
     render(<Harness status="ready" tuning={OPEN_G_TUNING} />);
-    expect(screen.getByText('和弦练习目前仅支持标准调弦。')).toBeInTheDocument();
+    expect(screen.getByText('和弦练习与大调指型练习目前仅支持标准调弦。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '和弦 → 指板位置' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '大调指型 → 音名' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '指板亮点 → 音名' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '音名 → 全部指板位置' })).toBeEnabled();
   });
@@ -55,6 +56,7 @@ describe('PracticeMode', () => {
     expect(screen.getByRole('button', { name: '大三 / 小三和弦辨别' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '指板亮点 → 音名' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '音名 → 全部指板位置' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '大调指型 → 音名' })).toBeEnabled();
   });
 
   it('shows only three focused ranges for the all-position exercise', () => {
@@ -91,5 +93,18 @@ describe('PracticeMode', () => {
     expect(screen.getByRole('button', { name: '重新听音' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '清除选择' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '提交答案' })).toBeInTheDocument();
+  });
+
+  it('shows controls and scale-note answers for the major-scale pattern exercise', () => {
+    render(<Harness status="ready" />);
+    fireEvent.click(screen.getByRole('button', { name: '大调指型 → 音名' }));
+
+    expect(screen.getByLabelText('大调：')).toHaveValue('C');
+    expect(screen.getByLabelText('指型：')).toHaveValue('mi');
+    expect(screen.getByText(/当前为/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('大调：'), { target: { value: 'D' } });
+    expect(screen.getByRole('button', { name: 'F♯' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C♯' })).toBeInTheDocument();
   });
 });

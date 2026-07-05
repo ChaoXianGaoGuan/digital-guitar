@@ -356,6 +356,10 @@ main {
   background: rgba(47, 138, 89, 0.17);
 }
 
+.highlight-area {
+  background: rgba(255, 246, 217, 0.22);
+}
+
 .string-segment:focus-visible,
 .open-string:focus-visible {
   z-index: 15;

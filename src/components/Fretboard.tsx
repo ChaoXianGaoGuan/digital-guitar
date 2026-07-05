@@ -43,6 +43,9 @@ export function Fretboard({
         max: Math.min(frets, Math.max(...areaPositions.map(position => position.fret)))
       }
     : null;
+  const areaFrameStart = areaRange ? fretPositions[areaRange.min === 0 ? 0 : areaRange.min - 1] : 0;
+  const areaFrameEnd = areaRange ? fretPositions[areaRange.max] : 0;
+  const areaFrameIncludesOpenStrings = areaRange?.min === 0;
 
   const getHighlightTone = (string: StringIndex, fret: number) => {
     const tones = highlights
@@ -84,13 +87,18 @@ export function Fretboard({
       <div className="fretboard">
         {areaRange && (
           <div
-            className="fret-area-frame"
+            className={`fret-area-frame ${areaFrameIncludesOpenStrings ? 'includes-open-strings' : ''}`}
             aria-hidden="true"
             data-fret-start={areaRange.min}
             data-fret-end={areaRange.max}
+            data-includes-open-strings={areaFrameIncludesOpenStrings ? 'true' : 'false'}
             style={{
-              left: `${fretPositions[areaRange.min === 0 ? 0 : areaRange.min - 1]}%`,
-              width: `${fretPositions[areaRange.max] - fretPositions[areaRange.min === 0 ? 0 : areaRange.min - 1]}%`
+              left: areaFrameIncludesOpenStrings
+                ? 'calc(-1 * (var(--open-strings-width) + var(--open-strings-gap)))'
+                : `${areaFrameStart}%`,
+              width: areaFrameIncludesOpenStrings
+                ? `calc(${areaFrameEnd}% + var(--open-strings-width) + var(--open-strings-gap))`
+                : `${areaFrameEnd - areaFrameStart}%`
             }}
           />
         )}

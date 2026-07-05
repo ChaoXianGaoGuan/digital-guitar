@@ -134,6 +134,8 @@ main {
 
 /* Fretboard */
 .fretboard-wrapper {
+  --open-strings-width: clamp(56px, 7vw, 82px);
+  --open-strings-gap: 10px;
   display: flex;
   align-items: center;
   padding: 24px 4px 18px;
@@ -143,9 +145,9 @@ main {
 .open-strings {
   position: relative;
   z-index: 20;
-  flex: 0 0 clamp(56px, 7vw, 82px);
+  flex: 0 0 var(--open-strings-width);
   height: 300px;
-  margin-right: 10px;
+  margin-right: var(--open-strings-gap);
   border-radius: 10px 0 0 10px;
   background: linear-gradient(90deg, rgba(245, 239, 231, 0.98), rgba(245, 239, 231, 0.88));
   box-shadow: 10px 0 16px rgba(47, 41, 36, 0.08);
@@ -362,8 +364,8 @@ main {
 
 .fret-area-frame {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
+  top: -24px;
+  bottom: -24px;
   z-index: 7;
   border: 3px solid rgba(248, 213, 107, 0.92);
   border-radius: 12px;
@@ -371,6 +373,10 @@ main {
     0 0 0 1px rgba(83, 57, 24, 0.3),
     0 0 18px rgba(248, 213, 107, 0.18);
   pointer-events: none;
+}
+
+.fret-area-frame.includes-open-strings {
+  border-radius: 14px 12px 12px 14px;
 }
 
 .string-segment:focus-visible,

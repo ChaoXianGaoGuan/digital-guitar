@@ -171,4 +171,28 @@ describe('Fretboard', () => {
     expect(screen.getByRole('button', { name: '6弦 1品 F' })).not.toHaveClass('highlighted');
     expect(screen.getByRole('button', { name: '4弦 3品 F' })).toHaveClass('highlighted');
   });
+
+  it('extends the area frame across open strings when fret zero is included', () => {
+    const { container } = render(
+      <Fretboard
+        tuning={STANDARD_TUNING}
+        showNoteNames={false}
+        noteDisplayMode="natural"
+        highlights={[
+          { position: { string: 0, fret: 0 }, tone: 'area' },
+          { position: { string: 5, fret: 3 }, tone: 'area' },
+          { position: { string: 2, fret: 2 }, tone: 'prompt' }
+        ]}
+        onPositionClick={() => undefined}
+      />
+    );
+
+    const frame = container.querySelector('.fret-area-frame');
+    expect(frame).toHaveClass('includes-open-strings');
+    expect(frame).toHaveAttribute('data-fret-start', '0');
+    expect(frame).toHaveAttribute('data-includes-open-strings', 'true');
+    expect(frame).toHaveStyle({
+      left: 'calc(-1 * (var(--open-strings-width) + var(--open-strings-gap)))'
+    });
+  });
 });

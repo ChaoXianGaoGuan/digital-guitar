@@ -88,6 +88,27 @@ npm run build
 
 ---
 
+## 部署到 GitHub Pages
+
+线上地址：[https://chaoxiangaoguan.github.io/digital-guitar/](https://chaoxiangaoguan.github.io/digital-guitar/)
+
+当前部署方式使用 `.github/workflows/deploy-pages.yml`：
+
+1. `main` 分支 push 后触发 GitHub Actions
+2. 安装依赖并执行 `npm run build`
+3. 将 `dist` 内容推送到 `gh-pages` 分支
+4. GitHub Pages 从 `gh-pages` 分支根目录发布站点
+
+仓库设置需要保持为：
+
+- `Settings -> Pages -> Source`: `Deploy from a branch`
+- `Branch`: `gh-pages`
+- `Folder`: `/ (root)`
+
+说明：项目曾使用 `actions/configure-pages`、`actions/upload-pages-artifact`、`actions/deploy-pages` 的 artifact 部署流程，但遇到 GitHub Pages 最终发布阶段的泛化错误 `Deployment failed, try again later.`。该错误发生在构建和 artifact 上传成功之后，因此当前改为更直接的 `gh-pages` 分支发布方案，便于稳定部署和排查。
+
+---
+
 ## 项目结构
 
 ```

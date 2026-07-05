@@ -144,7 +144,7 @@ main {
 
 .open-strings {
   position: relative;
-  z-index: 20;
+  z-index: 6;
   flex: 0 0 var(--open-strings-width);
   height: 300px;
   margin-right: var(--open-strings-gap);

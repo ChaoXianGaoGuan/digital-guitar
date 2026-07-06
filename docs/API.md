@@ -150,6 +150,14 @@ getNoteMidi(STANDARD_TUNING, 0, 0) // 40 (6弦空弦 E2)
 getNoteMidi(STANDARD_TUNING, 0, 5) // 45 (6弦5品 A2)
 ```
 
+#### `createCustomTuning(strings: Tuning['strings'], name?: string): Tuning`
+
+根据 6弦→1弦的 MIDI 数组创建自定义调弦，默认名称为 `自定义`。
+
+#### `isStandardTuning(tuning: Tuning): boolean`
+
+判断当前调弦是否与标准调弦完全一致。和弦练习与大调指型练习依赖此判断禁用非标准调弦入口。
+
 ---
 
 ## utils/chord.ts — 和弦定义
@@ -158,8 +166,11 @@ getNoteMidi(STANDARD_TUNING, 0, 5) // 45 (6弦5品 A2)
 
 ```typescript
 type ChordType = 'major' | 'minor' | 'dominant7'
+type ChordTier = 'beginner' | 'full'
 type ChordCurriculum = 'beginner' | 'all'
 type FretValue = number | null // null=闷弦，0=空弦
+type StringIndex = 0 | 1 | 2 | 3 | 4 | 5
+type FretboardPosition = { string: StringIndex; fret: number }
 ```
 
 ### 接口
@@ -172,6 +183,10 @@ interface Chord {
   intervals: number[]; // 音程（半音数），如 [0, 4, 7]
   tier: 'beginner' | 'full';
   fingerings: ChordFingering[];
+}
+
+interface ChordFingering {
+  frets: [FretValue, FretValue, FretValue, FretValue, FretValue, FretValue];
 }
 ```
 
@@ -199,6 +214,14 @@ ALL_CHORDS: Chord[] // 21个和弦（7音名 × 3类型）
 
 - 返回 `Chord[]`
 
+#### `parseChordFingering(notation: string): ChordFingering`
+
+将六弦到一弦的指法字符串转为 `ChordFingering`。`X` 表示闷弦，数字表示品位，例如 `"X32010"`。
+
+#### `getChordPool(curriculum: ChordCurriculum): Chord[]`
+
+根据题库级别返回和弦池。`beginner` 返回入门和弦，`all` 返回全部 21 个和弦。
+
 #### `getChordNotes(chord: Chord, octave?: number): number[]`
 
 获取和弦在指定八度的 MIDI 音符。
@@ -212,12 +235,24 @@ getChordNotes({ root: 'C', type: 'major', name: 'C', intervals: [0,4,7] }, 4)
 // [60, 64, 67] (C4, E4, G4)
 ```
 
+#### `getFingeringPositions(fingering: ChordFingering): FretboardPosition[]`
+
+获取某个真实指法中的发声位置，包括空弦，不包括闷弦。
+
+#### `getFingeringMidiNotes(fingering: ChordFingering, tuning?: Tuning): number[]`
+
+根据指法和调弦计算实际发声 MIDI 音符。默认使用标准调弦。
+
+#### `formatChordFingering(fingering: ChordFingering): string`
+
+把指法格式化为显示字符串，按 6弦→1弦输出，闷弦显示为 `X`。
+
 #### `getChordPositions(chord: Chord, tuning?: Tuning): FretboardPosition[]`
 
 获取和弦首个标准调弦真实指法中的发声位置，包括空弦，不包括闷弦。
 
 - `chord` — 和弦对象
-- `tuning` — 调弦配置
+- `tuning` — 当前保留为兼容参数，实际位置来自标准指法库
 - 返回位置数组，每项包含 `string`（弦索引）和 `fret`（品号）
 
 #### `checkChordPositions(userPositions, correctPositions): boolean`
@@ -286,6 +321,8 @@ type IntervalId = 'unison' | 'minor2' | 'major2' | 'minor3' | 'major3' | 'perfec
 type IntervalCurriculum = 'beginner' | 'advanced'
 type SamePitchCurriculum = 'beginner' | 'advanced'
 type PlaybackDirection = 'ascending' | 'descending'
+type ChordQuality = 'major' | 'minor'
+type HighlightTone = 'selected' | 'prompt' | 'correct' | 'area'
 
 type FretRange = 'all' | '1st' | '2nd' | '3rd'
 type PositionSearchRange = '1st' | '2nd' | '3rd'
@@ -305,6 +342,7 @@ interface PracticeQuestion {
   correctPosition?: { string: number; fret: number }; // 正确位置（参考）
   correctMidiNote?: number;       // 正确 MIDI 编号（用于验证位置）
   correctPositions?: { string: number; fret: number }[]; // 同音名位置题的全部答案
+  correctChordFingerings?: ChordFingering[]; // 和弦题接受的真实指法
   correctChordPositions?: { string: number; fret: number }[]; // 和弦正确位置
   correctChordName?: string;      // 和弦正确名称
   firstMidi?: number;             // 序列第一个音
@@ -318,6 +356,7 @@ interface PracticeQuestion {
   candidatePositions?: { string: number; fret: number }[]; // 三个候选亮点
   majorKey?: MajorKey;            // 大调指型题的大调
   scalePatternId?: MajorScalePatternId; // Mi/Sol/La/Ti/Re
+  scalePattern?: MajorScalePattern; // 当前大调指型数据
   scalePatternPositions?: { string: number; fret: number }[]; // 指型区域
   correctScaleNoteName?: string;  // 当前大调内的正确音名
 }
@@ -325,6 +364,11 @@ interface PracticeQuestion {
 interface PracticeStats {
   total: number;   // 答题数
   correct: number; // 正确数
+}
+
+interface FretHighlight {
+  position: FretboardPosition;
+  tone: HighlightTone;
 }
 ```
 
@@ -347,7 +391,7 @@ FRET_RANGE_NAMES: Record<FretRange, string>
 // '3rd': '第三把位 (9-12品)'
 
 FRET_RANGES: Record<FretRange, { min: number; max: number }>
-// 'all': { min: 1, max: 15 }
+// 'all': { min: 0, max: 15 }
 // '1st': { min: 0, max: 4 }
 // '2nd': { min: 5, max: 8 }
 // '3rd': { min: 9, max: 12 }
@@ -409,6 +453,10 @@ checkPositionAnswer({ string: 5, fret: 2 }, 65, STANDARD_TUNING) // false (1弦2
 #### `checkChordPositionAnswer(userPositions, acceptedFingerings): boolean`
 
 验证和弦位置答案。接受已录入真实指法中的任意一个答案。
+
+#### `checkChordFingeringAnswer(userPositions, acceptedFingerings): boolean`
+
+验证用户选择的位置是否匹配任意一个可接受真实指法。
 
 #### 新增练耳纯函数
 
@@ -476,12 +524,34 @@ interface UsePracticeReturn {
   positionSearchRange: PositionSearchRange;
   chordCurriculum: 'beginner' | 'all';
   intervalCurriculum: 'beginner' | 'advanced';
+  samePitchCurriculum: 'beginner' | 'advanced';
+  majorKey: MajorKey;
+  scalePatternId: MajorScalePatternId;
+  summary: PracticeSummary;
+  fretHighlights: FretHighlight[];
+  highlightedPositions: FretboardPosition[];
+  playbackMidiNotes: number[];
+  playbackKind: 'note' | 'sequence' | 'chord';
+  selectedNote: NoteName | null;
+  selectedPosition: FretboardPosition | null;
+  selectedChord: Chord | null;
+  selectedChordPositions: FretboardPosition[];
+  selectedNotePositions: FretboardPosition[];
+  selectedCandidatePosition: FretboardPosition | null;
   correctAnswer: {
     noteName?: NoteName;
+    scaleNoteName?: string;
     position?: { string: number; fret: number };
     positions?: { string: number; fret: number }[];
+    selectedPositions?: { string: number; fret: number }[];
+    missingPositions?: { string: number; fret: number }[];
+    extraPositions?: { string: number; fret: number }[];
     chordPositions?: { string: number; fret: number }[];
     chordName?: string;
+    fingering?: string;
+    pitchDirection?: PitchDirection;
+    interval?: IntervalId;
+    chordQuality?: 'major' | 'minor';
   } | null;
 
   startPractice: (type: PracticeType) => void;
@@ -490,6 +560,14 @@ interface UsePracticeReturn {
   setPositionSearchRange: (range: PositionSearchRange) => void;
   setChordCurriculum: (curriculum: 'beginner' | 'all') => void;
   setIntervalCurriculum: (curriculum: 'beginner' | 'advanced') => void;
+  setSamePitchCurriculum: (curriculum: 'beginner' | 'advanced') => void;
+  setMajorKey: (majorKey: MajorKey) => void;
+  setScalePattern: (patternId: MajorScalePatternId) => void;
+  selectNote: (note: NoteName) => void;
+  selectChord: (chord: Chord) => void;
+  clearChordPositions: () => void;
+  clearNotePositions: () => void;
+  clearCandidatePosition: () => void;
   submitNoteAndPosition: (name: NoteName, position: { string: number; fret: number }) => void;
   submitNoteName: (name: NoteName) => void;
   submitChordPositions: (positions?: FretboardPosition[]) => void;
@@ -498,6 +576,8 @@ interface UsePracticeReturn {
   submitPitchDirection: (answer: PitchDirection) => void;
   submitInterval: (answer: IntervalId) => void;
   submitChordQuality: (answer: 'major' | 'minor') => void;
+  submitSamePitchMatch: (position?: FretboardPosition | null) => void;
+  submitMajorScalePatternNoteName: (name: string) => void;
   handleFretboardClick: (click: FretClick) => boolean;
   nextQuestion: () => void;
   clearSummary: () => void;
@@ -518,6 +598,63 @@ interface UsePracticeReturn {
 **特殊行为**：
 - `setFretRange(range)` — 切换把位范围，如果正在练习则立即用新范围生成新题
 - `submitNoteAndPosition` — 听音高模式专用，音名+位置一起验证，只算一道题
+- `playbackMidiNotes` / `playbackKind` — 由当前题目派生，供 UI 决定播放单音、顺序音或和弦
+- `fretHighlights` — 由当前题目、用户选择和反馈派生，供指板统一渲染高亮
+
+---
+
+## hooks/usePracticeSummary.ts — 学习摘要
+
+### 常量
+
+```typescript
+MASTERY_WINDOW = 20
+MASTERY_THRESHOLD = 0.8
+```
+
+学习记录保存到 `localStorage`，key 为 `digital-guitar-practice-summary-v1`。每个 progress key 只保留最近 20 次结果；最近 20 题正确率至少 80% 时视为已掌握。
+
+### 接口
+
+```typescript
+interface PracticeSummaryEntry {
+  total: number;
+  correct: number;
+  wrong: number;
+}
+
+interface RecentMistake {
+  type: PracticeType;
+  prompt: string;
+  correctAnswer: string;
+  answeredAt: string;
+}
+
+interface PracticeSummary {
+  byType: Record<PracticeType, PracticeSummaryEntry>;
+  mistakeCounts: Record<string, number>;
+  recentMistakes: RecentMistake[];
+  recentResults: Partial<Record<string, boolean[]>>;
+}
+```
+
+### 函数
+
+#### `createEmptySummary(): PracticeSummary`
+
+创建包含全部练习类型初始统计的空摘要。
+
+#### `loadPracticeSummary(): PracticeSummary`
+
+从 `localStorage` 加载学习摘要，并对非法或旧数据做容错回退。
+
+#### `usePracticeSummary()`
+
+返回 `{ summary, recordAnswer, clearSummary }`。`recordAnswer(type, prompt, correctAnswer, isCorrect, progressKey?)` 会更新累计统计、最近结果和最近错题。
+
+#### `getPracticeMastery(summary: PracticeSummary, key: string)`
+
+根据 progress key 返回 `{ answered, accuracy, mastered }`。
 
 ---
 
@@ -528,7 +665,7 @@ interface UsePracticeReturn {
 ```typescript
 interface Settings {
   showNoteNames: boolean;                // 是否显示音名（默认 false）
-  noteDisplayMode: 'natural' | 'octave'; // 音名格式（默认 'natural'）
+  noteDisplayMode: 'natural' | 'octave'; // 音名格式：不带八度十二音 / 带八度（默认 'natural'）
   volume: number;                        // 音量 0-1（默认 0.5）
   theme: 'wood' | 'metal';              // 主题（默认 'wood'）
   tuning: Tuning;                        // 调弦（默认 STANDARD_TUNING）

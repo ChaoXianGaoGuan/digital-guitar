@@ -50,7 +50,7 @@
 ### 设置
 
 - 音名显示切换（默认隐藏）
-- 音名格式：自然音 (C D E F G A B) 或 带八度 (C4 D4 E4)
+- 音名格式：十二音音名 (C C♯ D...) 或 带八度 (C4 D4 E4)
 - 音量控制
 - 主题风格：木质纹理 / 金属纹理
 - 调弦设置：预设 Standard / Drop D / Open G + 自定义
@@ -135,6 +135,7 @@ digital guitar/
     │   ├── Fretboard.tsx               # 指板网格（6弦×15品）
     │   ├── FretCell.tsx                # 空弦与普通品位共享的交互单元
     │   ├── GuitarAudioProvider.tsx     # 全应用共享音频服务
+    │   ├── LearningRecord.tsx          # 学习记录、掌握度与最近错题
     │   ├── NoteButtons.tsx             # 音名选择按钮 (C/D/E/F/G/A/B)
     │   ├── ChordButtons.tsx            # 和弦名选择按钮（大三/小三/七）
     │   ├── PracticeMode.tsx            # 练习模式主组件
@@ -142,16 +143,22 @@ digital guitar/
     │   ├── SettingsModal.tsx           # 设置弹窗
     │   └── TuningModal.tsx             # 调弦设置弹窗
     │
+    ├── context/
+    │   └── guitarAudioContext.ts       # 音频 Provider 上下文类型
+    │
     ├── hooks/                          # 自定义 Hook
     │   ├── useGuitarAudio.ts           # 音频加载与播放
     │   ├── usePractice.ts              # 练习状态机（题目、验证、统计）
+    │   ├── usePracticeSummary.ts       # 学习记录与掌握度持久化
     │   └── useSettings.ts              # 设置读写与 localStorage 持久化
     │
     ├── utils/                          # 纯函数工具
+    │   ├── fretboard.ts                # 指板点击事件类型
     │   ├── note.ts                     # MIDI ↔ 音名转换
     │   ├── tuning.ts                   # 调弦配置定义
     │   ├── chord.ts                    # 和弦定义、位置计算
     │   ├── majorScalePattern.ts        # 12 大调与 Mi/Sol/La/Ti/Re 指型
+    │   ├── practiceCatalog.ts          # 练习分类、描述与推荐路径
     │   └── practice.ts                 # 题目生成与答案验证
     │
     ├── styles/
@@ -159,7 +166,19 @@ digital guitar/
     │
     └── __tests__/
         ├── note.test.ts                # 音符工具测试
-        └── chord.test.ts               # 和弦工具测试
+        ├── chord.test.ts               # 和弦工具测试
+        ├── ear-training.test.ts        # 练耳题目测试
+        ├── fretboard.test.tsx          # 指板交互测试
+        ├── guitar-audio-provider.test.tsx # 音频 Provider 测试
+        ├── learning-record.test.tsx    # 学习记录 UI 测试
+        ├── major-scale-pattern.test.ts # 大调指型测试
+        ├── note-position-practice.test.ts # 音名位置练习测试
+        ├── practice-mode.test.tsx      # 练习模式 UI 测试
+        ├── practice-summary.test.ts    # 学习摘要测试
+        ├── settings.test.ts            # 设置持久化测试
+        ├── tuning-modal.test.tsx       # 调弦弹窗测试
+        ├── tuning.test.ts              # 调弦工具测试
+        └── usePractice.test.ts         # 练习状态机测试
 ```
 
 ---
@@ -309,10 +328,12 @@ interface Chord {
 ### 添加新的练习类型
 
 1. 在 `src/utils/practice.ts` 的 `PracticeType` 联合类型中添加新类型
-2. 在 `PRACTICE_TYPE_NAMES` 中添加中文名
-3. 在 `generateQuestion()` 中添加分支，调用新的题目生成函数
-4. 在 `PracticeMode.tsx` 的 `renderQuestion()` 和 `renderAnswerInput()` 中添加对应 UI
-5. 在 `usePractice.ts` 中添加对应的提交函数
+2. 在 `PRACTICE_TYPE_NAMES` 中添加中文名，并在 `generateQuestion()` 中添加出题分支
+3. 在 `src/utils/practiceCatalog.ts` 中添加分类、描述、推荐路径或音频需求
+4. 在 `usePractice.ts` 中添加状态、提交函数、播放信息和指板高亮派生逻辑
+5. 在 `PracticeMode.tsx` 的 `renderQuestion()`、答案区和反馈区添加对应 UI
+6. 如果新题型需要学习记录，确认 `usePracticeSummary.ts` 的类型列表与 progress key
+7. 添加或更新对应测试与 API 文档
 
 ### 添加新的调弦预设
 

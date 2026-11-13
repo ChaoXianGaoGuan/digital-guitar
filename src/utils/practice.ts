@@ -22,9 +22,7 @@ export type PracticeType =
   | 'reference-pitch-to-position'
   | 'interval-identification'
   | 'chord-quality'
-  | 'major-scale-pattern-note-name'
-  | 'chord-degree'
-  | 'chord-progression';
+  | 'major-scale-pattern-note-name';
 
 export type PitchDirection = 'higher' | 'same' | 'lower';
 export type IntervalId =
@@ -71,8 +69,6 @@ export const PRACTICE_TYPE_NAMES: Record<PracticeType, string> = {
   'reference-pitch-to-position': '听音高 → 指板自由定位',
   'interval-identification': '音程听辨',
   'chord-quality': '大三 / 小三和弦辨别',
-  'chord-degree': '调内和弦级数',
-  'chord-progression': '流行和弦走向',
   'major-scale-pattern-note-name': '大调指型 → 音名'
 };
 
@@ -403,9 +399,6 @@ export function generateQuestion(
   scalePatternId: MajorScalePatternId = 'mi'
 ): PracticeQuestion {
   switch (type) {
-    case 'chord-degree':
-    case 'chord-progression':
-      throw new Error('该练习使用独立出题器');
     case 'note-to-name-and-position':
     case 'position-to-name':
       return generateNoteQuestion(type, tuning, fretRange);

@@ -11,7 +11,7 @@ interface FretCellProps {
   showNoteName: boolean;
   noteDisplayMode: 'natural' | 'octave';
   isHighlighted?: boolean;
-  highlightTone?: 'selected' | 'prompt' | 'correct' | 'area' | 'red';
+  highlightTone?: 'selected' | 'prompt' | 'correct' | 'area';
   showClickFeedback?: boolean;
   style?: CSSProperties;
   onClick: (click: FretClick) => void;

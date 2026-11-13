@@ -38,9 +38,7 @@ export const PRACTICE_TYPES: PracticeType[] = [
   'reference-pitch-to-position',
   'interval-identification',
   'chord-quality',
-  'major-scale-pattern-note-name',
-  'chord-degree',
-  'chord-progression'
+  'major-scale-pattern-note-name'
 ];
 
 function createEmptyEntry(): PracticeSummaryEntry {
@@ -61,8 +59,6 @@ export function createEmptySummary(): PracticeSummary {
       'reference-pitch-to-position': createEmptyEntry(),
       'interval-identification': createEmptyEntry(),
       'chord-quality': createEmptyEntry(),
-      'chord-degree': createEmptyEntry(),
-      'chord-progression': createEmptyEntry(),
       'major-scale-pattern-note-name': createEmptyEntry()
     },
     mistakeCounts: {},

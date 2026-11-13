@@ -787,11 +787,3 @@ select {
     padding: 18px;
   }
 }
-
-.dot-red { background: #d52532; }
-.degree-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.degree-controls button[aria-pressed="true"] { outline: 3px solid #a2452e; }
-.degree-panel fieldset { margin: 10px 0; }
-.degree-panel label { margin-right: 12px; }
-.degree-panel .wrong { color: #a51620; }
-.degree-panel .right { color: #18742d; }

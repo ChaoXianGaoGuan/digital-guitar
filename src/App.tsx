@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 import './App.css';
+import { ChordDegreePractice } from './components/ChordDegreePractice';
+import { isStandardTuning } from './utils/tuning';
 import { Fretboard } from './components/Fretboard';
 import { GuitarAudioProvider } from './components/GuitarAudioProvider';
 import { PracticeMode } from './components/PracticeMode';
@@ -21,6 +23,7 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
   const { playNote, status, error, retry } = useGuitarAudio();
   const practice = usePractice(settings.tuning);
   const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [isDegreeMode, setIsDegreeMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const handlePositionClick = useCallback((click: FretClick) => {
@@ -39,6 +42,7 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
   const handleSetTuning = useCallback((tuning: Tuning) => {
     practice.stopPractice();
     setIsPracticeMode(false);
+    setIsDegreeMode(false);
     setTuning(tuning);
   }, [practice, setTuning]);
 
@@ -47,9 +51,10 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
       <header>
         <h1>数字吉他</h1>
         <div className="controls">
-          {!isPracticeMode && (
+          {!isPracticeMode && !isDegreeMode && (
             <button type="button" onClick={() => setIsPracticeMode(true)}>练习模式</button>
           )}
+          {!isPracticeMode && !isDegreeMode && <button type="button" disabled={!isStandardTuning(settings.tuning)} title={!isStandardTuning(settings.tuning) ? "仅支持标准调弦" : undefined} onClick={() => setIsDegreeMode(true)}>和弦级数与走向</button>}
           <button type="button" onClick={() => setShowSettings(true)}>设置</button>
         </div>
       </header>
@@ -62,6 +67,7 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
       )}
 
       <main>
+        {!isStandardTuning(settings.tuning) && !isPracticeMode && !isDegreeMode && <p>和弦级数与走向训练仅支持标准调弦。</p>}
         {isPracticeMode && (
           <PracticeMode
             tuning={settings.tuning}
@@ -71,14 +77,15 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
           />
         )}
 
-        <Fretboard
+        {isDegreeMode && <ChordDegreePractice settings={settings} practice={practice} onClose={() => setIsDegreeMode(false)} />}
+        {!isDegreeMode && <Fretboard
           tuning={settings.tuning}
           showNoteNames={settings.showNoteNames}
           noteDisplayMode={settings.noteDisplayMode}
           highlights={isPracticeMode ? practice.fretHighlights : []}
           showClickFeedback={!isPracticeMode}
           onPositionClick={handlePositionClick}
-        />
+        />}
       </main>
 
       {showSettings && (

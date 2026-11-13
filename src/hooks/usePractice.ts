@@ -964,6 +964,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
   return {
     ...state,
     summary,
+    recordAnswer,
     fretHighlights,
     highlightedPositions,
     playbackMidiNotes,

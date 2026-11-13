@@ -41,6 +41,8 @@ export const PRACTICE_CATALOG: PracticeCatalogEntry[] = [
     description: '识别音名，并定位到相同 MIDI 音高。',
     advanced: true
   },
+  { type: 'chord-degree', category: 'chord', description: '从调名与级数，找到对应的顺阶和弦。' },
+  { type: 'chord-progression', category: 'chord', description: '把流行级数走向，转换成完整和弦进行。' },
   { type: 'chord-to-position', category: 'chord', description: '根据和弦名按出标准指法。' },
   { type: 'position-to-chord', category: 'chord', description: '根据指板上的完整指法识别和弦。' },
   {
@@ -87,6 +89,8 @@ export function practiceRequiresAudio(type: PracticeType): boolean {
   return [
     'note-to-name-and-position',
     'listen-to-chord',
+    'chord-degree',
+    'chord-progression',
     'pitch-direction',
     'same-pitch-matching',
     'reference-pitch-to-position',

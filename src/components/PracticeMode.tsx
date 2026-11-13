@@ -1,3 +1,5 @@
+import { HarmonyPractice } from './HarmonyPractice';
+import { isHarmonyType } from '../utils/harmony';
 import { useEffect } from 'react';
 import type { ChordCurriculum, FretboardPosition } from '../utils/chord';
 import type { GuitarAudioStatus } from '../context/guitarAudioContext';
@@ -56,7 +58,7 @@ function isChordPractice(type: PracticeType): boolean {
 }
 
 function requiresStandardTuning(type: PracticeType): boolean {
-  return isChordPractice(type) || type === 'major-scale-pattern-note-name';
+  return isChordPractice(type) || isHarmonyType(type) || type === 'major-scale-pattern-note-name';
 }
 
 function formatPosition(position: FretboardPosition): string {
@@ -195,7 +197,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
                   >
                     <strong>{PRACTICE_TYPE_NAMES[entry.type]}{entry.advanced ? ' · 进阶' : ''}</strong>
                     <span>{entry.description}</span>
-                    <small>{formatProgress(mastery.answered, mastery.accuracy, mastery.mastered)}</small>
+                    <small>{isHarmonyType(entry.type) ? `5 个大调 · 累计 ${summary.byType[entry.type].total} 题` : formatProgress(mastery.answered, mastery.accuracy, mastery.mastered)}</small>
                   </button>
                 );
               })}
@@ -329,7 +331,7 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
   };
 
   return (
-    <section className="practice-mode">
+    <section className={`practice-mode ${isHarmonyType(practiceType) ? "harmony-mode" : ""}`}>
       <div className="practice-mode-switcher">
         <label htmlFor="practice-type">练习类型：</label>
         <select id="practice-type" value={practiceType} onChange={event => startPractice(event.target.value as PracticeType)}>
@@ -344,6 +346,8 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
           ))}
         </select>
       </div>
+
+      {isHarmonyType(practiceType) ? <HarmonyPractice key={practiceType} practice={practice} /> : <>
 
       {(practiceType === 'position-to-name'
         || practiceType === 'note-to-name-and-position'
@@ -478,8 +482,12 @@ export function PracticeMode({ tuning, audioStatus, practice, onStop }: Practice
         </div>
       )}
 
-      <LearningRecord summary={summary} onClear={clearSummary} />
-      <div className="practice-controls"><button type="button" onClick={handleStop}>停止练习</button></div>
+      </>}
+
+      {!isHarmonyType(practiceType) && <>
+        <LearningRecord summary={summary} onClear={clearSummary} />
+        <div className="practice-controls"><button type="button" onClick={handleStop}>停止练习</button></div>
+      </>}
     </section>
   );
 }

@@ -4,7 +4,7 @@ import type { FretClick } from '../utils/fretboard';
 import type { Tuning } from '../utils/tuning';
 import { FretCell } from './FretCell';
 
-export type HighlightTone = 'selected' | 'prompt' | 'correct' | 'area';
+export type HighlightTone = 'selected' | 'prompt' | 'correct' | 'area' | 'chord';
 export interface FretHighlight {
   position: FretboardPosition;
   tone: HighlightTone;
@@ -14,6 +14,7 @@ interface FretboardProps {
   tuning: Tuning;
   showNoteNames: boolean;
   noteDisplayMode: 'natural' | 'octave';
+  mutedStrings?: StringIndex[];
   highlights?: FretHighlight[];
   showClickFeedback?: boolean;
   onPositionClick: (click: FretClick) => void;
@@ -23,6 +24,7 @@ export function Fretboard({
   tuning,
   showNoteNames,
   noteDisplayMode,
+  mutedStrings = [],
   highlights = [],
   showClickFeedback = true,
   onPositionClick
@@ -51,6 +53,7 @@ export function Fretboard({
     const tones = highlights
       .filter(highlight => highlight.position.string === string && highlight.position.fret === fret)
       .map(highlight => highlight.tone);
+    if (tones.includes('chord')) return 'chord';
     if (tones.includes('correct')) return 'correct';
     if (tones.includes('selected')) return 'selected';
     if (tones.includes('prompt')) return 'prompt';
@@ -68,6 +71,7 @@ export function Fretboard({
               key={`open-${stringIndex}`}
               position={{ string: stringIndex, fret: 0 }}
               midi={midiNote}
+              isMuted={mutedStrings.includes(stringIndex)}
               variant="open"
               showNoteName={showNoteNames}
               noteDisplayMode={noteDisplayMode}

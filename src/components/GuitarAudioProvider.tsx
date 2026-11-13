@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { GuitarAudioContext } from '../context/guitarAudioContext';
-import type { GuitarAudioStatus } from '../context/guitarAudioContext';
+import type { ChordSequenceOptions, GuitarAudioStatus } from '../context/guitarAudioContext';
 
 interface SoundfontInstrument {
   play: (note: string, when?: number, options?: { duration?: number; gain?: number }) => unknown;
@@ -39,10 +39,13 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
   const audioContextRef = useRef<AudioContext | null>(null);
   const instrumentRef = useRef<SoundfontInstrument | null>(null);
   const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const sequenceVersionRef = useRef(0);
 
   const stopSequence = useCallback(() => {
+    sequenceVersionRef.current += 1;
     sequenceTimersRef.current.forEach(timer => clearTimeout(timer));
     sequenceTimersRef.current = [];
+    instrumentRef.current?.stop();
   }, []);
 
   useEffect(() => {
@@ -91,7 +94,7 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
     };
   }, [attempt, stopSequence]);
 
-  const playNotes = useCallback((midiNotes: number[], duration: number) => {
+  const playNotes = useCallback((midiNotes: number[], duration: number, version?: number) => {
     const play = async () => {
       try {
         const context = audioContextRef.current;
@@ -101,6 +104,8 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
         if (context.state === 'suspended') {
           await context.resume();
         }
+
+        if (version !== undefined && version !== sequenceVersionRef.current) return;
 
         const when = context.currentTime;
         for (const midi of midiNotes) {
@@ -115,11 +120,11 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
   }, [volume]);
 
   const playNote = useCallback((midi: number) => {
-    playNotes([midi], 0.5);
+    playNotes([midi], 0.5, sequenceVersionRef.current);
   }, [playNotes]);
 
   const playChord = useCallback((midiNotes: number[]) => {
-    playNotes(midiNotes, 0.8);
+    playNotes(midiNotes, 0.8, sequenceVersionRef.current);
   }, [playNotes]);
 
   const playSequence = useCallback((
@@ -129,12 +134,30 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
     stopSequence();
     const noteDurationMs = options.noteDurationMs ?? 500;
     const gapMs = options.gapMs ?? 250;
+    const version = sequenceVersionRef.current;
     midiNotes.forEach((midi, index) => {
       const timer = setTimeout(() => {
-        playNotes([midi], noteDurationMs / 1000);
+        playNotes([midi], noteDurationMs / 1000, version);
       }, index * (noteDurationMs + gapMs));
       sequenceTimersRef.current.push(timer);
     });
+  }, [playNotes, stopSequence]);
+
+  const playChordSequence = useCallback((chords: number[][], options: ChordSequenceOptions = {}) => {
+    stopSequence();
+    const version = sequenceVersionRef.current;
+    const duration = options.chordDurationMs ?? 800;
+    const step = duration + (options.gapMs ?? 200);
+    chords.forEach((notes, index) => {
+      sequenceTimersRef.current.push(setTimeout(() => {
+        if (version !== sequenceVersionRef.current) return;
+        options.onStep?.(index);
+        playNotes(notes, duration / 1000, version);
+      }, index * step));
+    });
+    sequenceTimersRef.current.push(setTimeout(() => {
+      if (version === sequenceVersionRef.current) options.onComplete?.();
+    }, chords.length ? (chords.length - 1) * step + duration : 0));
   }, [playNotes, stopSequence]);
 
   const retry = useCallback(() => {
@@ -149,12 +172,13 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
   const value = useMemo(() => ({
     playNote,
     playChord,
+    playChordSequence,
     playSequence,
     stopSequence,
     status,
     error,
     retry
-  }), [playNote, playChord, playSequence, stopSequence, status, error, retry]);
+  }), [playNote, playChord, playChordSequence, playSequence, stopSequence, status, error, retry]);
 
   return (
     <GuitarAudioContext.Provider value={value}>

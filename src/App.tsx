@@ -1,3 +1,5 @@
+import { LearningRecord } from './components/LearningRecord';
+import { isHarmonyType } from './utils/harmony';
 import { useCallback, useState } from 'react';
 import './App.css';
 import { Fretboard } from './components/Fretboard';
@@ -75,10 +77,15 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
           tuning={settings.tuning}
           showNoteNames={settings.showNoteNames}
           noteDisplayMode={settings.noteDisplayMode}
+          mutedStrings={isPracticeMode ? practice.mutedStrings : []}
           highlights={isPracticeMode ? practice.fretHighlights : []}
           showClickFeedback={!isPracticeMode}
           onPositionClick={handlePositionClick}
         />
+        {isPracticeMode && isHarmonyType(practice.practiceType) && <section className="harmony-records">
+          <LearningRecord summary={practice.summary} onClear={practice.clearSummary} />
+          <div className="practice-controls"><button type="button" onClick={handleStopPractice}>停止练习</button></div>
+        </section>}
       </main>
 
       {showSettings && (

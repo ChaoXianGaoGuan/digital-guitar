@@ -690,3 +690,30 @@ interface UseSettingsReturn {
 - 从 `localStorage`（key: `digital-guitar-settings-v2`）加载设置，并迁移旧键 `digital-guitar-settings`
 - 任何设置变更自动保存到 `localStorage`
 - `resetToDefault()` 恢复所有设置为默认值
+
+
+## 和弦级数与走向扩展
+
+### `utils/harmony.ts`
+
+- `HarmonyKey = 'C' | 'G' | 'D' | 'A' | 'E'`；`TriadQuality = 'major' | 'minor' | 'dim'`。
+- `Triad { root: number; quality: TriadQuality }`：根音为 0–11 半音索引，显示使用升号。
+- `HarmonyConfig { keys: HarmonyKey[]; degrees: number[]; progressions: string[] }`。
+- `HarmonyQuestion { key: HarmonyKey; degrees: number[]; chords: Triad[] }`。
+- `degreeChord(key, degree)`、`triadName(chord)`、`triadFingering(chord)` 分别提供级数转换、和弦命名及标准调弦真实指法。
+- `generateHarmonyQuestion(config, progression)` 在选定调与题库内随机生成题目；`canStartHarmony()` 拒绝空配置。
+- `validProgression(value)` 只接受 1–32 位数字 1–7；`loadCustomProgressions()` 校验、去重并兼容旧本地数据。
+
+### 练习与指板接口
+
+`PracticeType` 增加 `chord-degree`、`chord-progression`，`PracticeQuestion.harmony?: HarmonyQuestion` 保存对应音乐数据。`generateQuestion()` 增加可选末尾参数 `harmonyConfig`，原调用兼容。
+
+`usePractice` 提供 `setHarmonyConfig`、`beginHarmony`、`editHarmonyConfig`、`selectHarmonyAnswer`、`focusHarmonyAnswer`、`previewHarmony`、`submitHarmony`、`addCustomProgression`、`removeCustomProgression`。答案及反馈由 reducer 管理，提交后锁定计分，正确结果也不自动切题。摘要使用 `${type}:${key}` 的掌握度键，保持原摘要和自定义走向存储键兼容。
+
+`HighlightTone` 增加 `chord`，用于红色真实指法；`Fretboard.mutedStrings?: StringIndex[]` 显示闷弦标记。
+
+### 和弦序列音频
+
+`playChordSequence(chords: number[][], options?: ChordSequenceOptions): void`。
+
+`ChordSequenceOptions` 包含 `chordDurationMs`（默认 800）、`gapMs`（默认 200）、`onStep(index)` 和 `onComplete()`。`stopSequence()` 停止当前发声、清除后续音符／和弦与完成回调，并阻止等待 AudioContext 恢复的旧播放继续发声。新的序列开始前自动取消旧序列。

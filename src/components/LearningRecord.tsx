@@ -1,3 +1,4 @@
+import { HARMONY_KEYS } from '../utils/harmony';
 import { getPracticeMastery } from '../hooks/usePracticeSummary';
 import type { PracticeSummary } from '../hooks/usePracticeSummary';
 import { RECOMMENDED_LESSONS } from '../utils/practiceCatalog';
@@ -47,6 +48,15 @@ export function LearningRecord({ summary, onClear }: LearningRecordProps) {
           );
         })}
       </ul>
+      {(['chord-degree', 'chord-progression'] as const).map(type => summary.byType[type].total > 0 && (
+        <div key={type} className="harmony-record-group">
+          <h4>{PRACTICE_TYPE_NAMES[type]} · 累计 {summary.byType[type].total} 题，正确 {summary.byType[type].correct} 题</h4>
+          <ul className="learning-progress">{HARMONY_KEYS.map(key => {
+            const mastery = getPracticeMastery(summary, `${type}:${key}`);
+            return <li key={key}>{key} 大调：{mastery.mastered ? '已掌握' : `${mastery.answered} / 20`}（{Math.round(mastery.accuracy * 100)}%）</li>;
+          })}</ul>
+        </div>
+      ))}
       <button type="button" onClick={handleClear} disabled={total === 0}>清空记录</button>
     </details>
   );

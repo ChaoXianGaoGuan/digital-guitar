@@ -1,10 +1,17 @@
+import {
+  canStartHarmony, completeAnswer, CUSTOM_PROGRESSIONS_KEY, DEFAULT_HARMONY_CONFIG,
+  isHarmonyType, loadCustomProgressions, POP_PROGRESSIONS, sameTriad,
+  triadFingering, triadName, validProgression
+} from '../utils/harmony';
+import type { HarmonyAnswer, HarmonyConfig, Triad } from '../utils/harmony';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type {
   Chord,
   ChordCurriculum,
-  FretboardPosition
+  FretboardPosition,
+  StringIndex
 } from '../utils/chord';
-import { formatChordFingering, getFingeringMidiNotes } from '../utils/chord';
+import { formatChordFingering, getFingeringMidiNotes, getFingeringPositions } from '../utils/chord';
 import type { FretClick } from '../utils/fretboard';
 import type { NoteName } from '../utils/note';
 import type { MajorKey, MajorScalePatternId } from '../utils/majorScalePattern';
@@ -35,7 +42,7 @@ import {
   generateQuestion
 } from '../utils/practice';
 import type { Tuning } from '../utils/tuning';
-import { STANDARD_TUNING } from '../utils/tuning';
+import { isStandardTuning, STANDARD_TUNING } from '../utils/tuning';
 import { usePracticeSummary } from './usePracticeSummary';
 
 export interface CorrectAnswer {
@@ -55,6 +62,14 @@ export interface CorrectAnswer {
 }
 
 interface PracticeState {
+  harmonyConfig: HarmonyConfig;
+  customProgressions: string[];
+  harmonyReady: boolean;
+  harmonyAnswers: HarmonyAnswer[];
+  harmonyIndex: number;
+  harmonyPreview: Triad | null;
+  harmonyPreviewSource: 'answer' | 'correct' | 'sequence';
+  harmonyRevision: number;
   isActive: boolean;
   practiceType: PracticeType | null;
   question: PracticeQuestion | null;
@@ -77,6 +92,14 @@ interface PracticeState {
 }
 
 type PracticeAction =
+  | { type: 'harmony-config'; config: HarmonyConfig }
+  | { type: 'harmony-begin'; question: PracticeQuestion }
+  | { type: 'harmony-edit-config' }
+  | { type: 'harmony-select'; patch: Partial<HarmonyAnswer> }
+  | { type: 'harmony-focus'; index: number }
+  | { type: 'harmony-preview'; chord: Triad; index: number; source: 'answer' | 'correct' | 'sequence' }
+  | { type: 'harmony-custom'; values: string[]; config: HarmonyConfig }
+
   | { type: 'start'; practiceType: PracticeType; question: PracticeQuestion }
   | { type: 'stop' }
   | { type: 'new-question'; question: PracticeQuestion }
@@ -99,6 +122,14 @@ type PracticeAction =
   | { type: 'submit-result'; isCorrect: boolean; answer: CorrectAnswer };
 
 const INITIAL_STATE: PracticeState = {
+  harmonyConfig: DEFAULT_HARMONY_CONFIG,
+  customProgressions: [],
+  harmonyReady: false,
+  harmonyAnswers: [],
+  harmonyIndex: 0,
+  harmonyPreview: null,
+  harmonyPreviewSource: 'answer',
+  harmonyRevision: 0,
   isActive: false,
   practiceType: null,
   question: null,
@@ -124,6 +155,10 @@ function withNewQuestion(state: PracticeState, question: PracticeQuestion): Prac
   return {
     ...state,
     question,
+    harmonyAnswers: (question.harmony?.degrees ?? []).map(() => ({ root: null, quality: null })),
+    harmonyIndex: 0,
+    harmonyPreview: null,
+    harmonyPreviewSource: 'answer',
     feedback: 'none',
     correctAnswer: null,
     selectedNote: null,
@@ -137,10 +172,47 @@ function withNewQuestion(state: PracticeState, question: PracticeQuestion): Prac
 
 export function practiceReducer(state: PracticeState, action: PracticeAction): PracticeState {
   switch (action.type) {
+    case 'harmony-config':
+      return { ...state, harmonyConfig: action.config };
+    case 'harmony-custom':
+      return { ...state, customProgressions: action.values, harmonyConfig: action.config };
+    case 'harmony-edit-config':
+      return { ...state, harmonyReady: false, harmonyPreview: null };
+    case 'harmony-begin':
+      return withNewQuestion({ ...state, harmonyReady: true }, action.question);
+    case 'harmony-select': {
+      if (state.feedback !== 'none' || !state.harmonyReady) return state;
+      const answers = state.harmonyAnswers.map((a, i) => i === state.harmonyIndex ? { ...a, ...action.patch } : a);
+      return {
+        ...state,
+        harmonyAnswers: answers,
+        harmonyPreview: completeAnswer(answers[state.harmonyIndex]),
+        harmonyPreviewSource: 'answer',
+        harmonyRevision: state.harmonyRevision + 1
+      };
+    }
+    case 'harmony-focus':
+      if (!state.harmonyAnswers[action.index]) return state;
+      return {
+        ...state,
+        harmonyIndex: action.index,
+        harmonyPreview: completeAnswer(state.harmonyAnswers[action.index]),
+        harmonyPreviewSource: 'answer',
+        harmonyRevision: state.harmonyRevision + 1
+      };
+    case 'harmony-preview':
+      return {
+        ...state,
+        harmonyIndex: action.index,
+        harmonyPreview: action.chord,
+        harmonyPreviewSource: action.source,
+        harmonyRevision: state.harmonyRevision + 1
+      };
     case 'start':
       return withNewQuestion({
         ...state,
         isActive: true,
+        harmonyReady: false,
         practiceType: action.practiceType,
         stats: { total: 0, correct: 0 },
         positionSearchRange: action.practiceType === 'note-name-to-all-positions'
@@ -150,6 +222,8 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
     case 'stop':
       return {
         ...INITIAL_STATE,
+        harmonyConfig: state.harmonyConfig,
+        customProgressions: state.customProgressions,
         fretRange: state.fretRange,
         positionSearchRange: state.positionSearchRange,
         chordCurriculum: state.chordCurriculum,
@@ -253,6 +327,7 @@ export function practiceReducer(state: PracticeState, action: PracticeAction): P
 }
 
 function getQuestionPrompt(question: PracticeQuestion): string {
+  if (question.harmony) return `${question.harmony.key} 大调 · ${question.harmony.degrees.join('')}`;
   if (question.type === 'pitch-direction') return '高低比较';
   if (question.type === 'interval-identification') return '音程听辨';
   if (question.type === 'chord-quality') return '大三 / 小三和弦辨别';
@@ -267,6 +342,7 @@ function getQuestionPrompt(question: PracticeQuestion): string {
 }
 
 function getCorrectAnswerText(question: PracticeQuestion): string {
+  if (question.harmony) return question.harmony.chords.map(triadName).join(' – ');
   return question.correctChordName
     ?? question.correctNoteName
     ?? question.correctPitchDirection
@@ -277,7 +353,7 @@ function getCorrectAnswerText(question: PracticeQuestion): string {
 }
 
 export function usePractice(tuning: Tuning = STANDARD_TUNING) {
-  const [state, dispatch] = useReducer(practiceReducer, INITIAL_STATE);
+  const [state, dispatch] = useReducer(practiceReducer, INITIAL_STATE, initial => ({ ...initial, customProgressions: loadCustomProgressions() }));
   const nextQuestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canSubmitRef = useRef(false);
   const { summary, recordAnswer, clearSummary } = usePracticeSummary();
@@ -290,6 +366,10 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
   }, []);
 
   useEffect(() => cancelScheduledQuestion, [cancelScheduledQuestion]);
+
+  useEffect(() => {
+    try { localStorage.setItem(CUSTOM_PROGRESSIONS_KEY, JSON.stringify(state.customProgressions)); } catch { /* Storage may be unavailable. */ }
+  }, [state.customProgressions]);
 
   const createQuestion = useCallback((
     type: PracticeType,
@@ -307,8 +387,10 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     intervalCurriculum,
     samePitchCurriculum,
     majorKey,
-    scalePatternId
+    scalePatternId,
+    state.harmonyConfig
   ), [
+    state.harmonyConfig,
     state.fretRange,
     state.chordCurriculum,
     state.intervalCurriculum,
@@ -319,12 +401,13 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
   ]);
 
   const startPractice = useCallback((type: PracticeType) => {
+    if (isHarmonyType(type) && !isStandardTuning(tuning)) return;
     cancelScheduledQuestion();
     canSubmitRef.current = true;
     dispatch({
       type: 'start',
       practiceType: type,
-      question: type === 'note-name-to-all-positions'
+      question: isHarmonyType(type) ? generateQuestion(type) : type === 'note-name-to-all-positions'
         ? generateQuestion(type, tuning, '1st')
         : createQuestion(type)
     });
@@ -374,15 +457,38 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
       getQuestionPrompt(currentQuestion),
       getCorrectAnswerText(currentQuestion),
       isCorrect,
-      currentQuestion.type === 'interval-identification'
+      currentQuestion.harmony ? `${currentQuestion.type}:${currentQuestion.harmony.key}` : currentQuestion.type === 'interval-identification'
         ? `interval-identification:${state.intervalCurriculum}`
         : currentQuestion.type === 'same-pitch-matching'
           ? `same-pitch-matching:${state.samePitchCurriculum}`
           : currentQuestion.type
     );
     dispatch({ type: 'submit-result', isCorrect, answer });
-    if (isCorrect) scheduleNextQuestion();
+    if (isCorrect && !isHarmonyType(currentQuestion.type)) scheduleNextQuestion();
   }, [recordAnswer, scheduleNextQuestion, state.intervalCurriculum, state.samePitchCurriculum]);
+
+  const beginHarmony = () => {
+    if (!state.practiceType || !isHarmonyType(state.practiceType) || !isStandardTuning(tuning)
+      || !canStartHarmony(state.harmonyConfig, state.practiceType === 'chord-progression')) return;
+    cancelScheduledQuestion();
+    canSubmitRef.current = true;
+    dispatch({ type: 'harmony-begin', question: createQuestion(state.practiceType) });
+  };
+  const submitHarmony = () => {
+    const question = state.question;
+    if (!state.harmonyReady || state.feedback !== 'none' || !question?.harmony) return;
+    if (state.harmonyAnswers.some(a => !completeAnswer(a))) return;
+    handleResult(state.harmonyAnswers.every((a, i) => sameTriad(completeAnswer(a), question.harmony!.chords[i])), question, {});
+  };
+  const addCustomProgression = (value: string): boolean => {
+    if (!validProgression(value)) return false;
+    const values = [...new Set([...state.customProgressions, value])];
+    dispatch({ type: 'harmony-custom', values, config: { ...state.harmonyConfig, progressions: [...new Set([...state.harmonyConfig.progressions, value])] } });
+    return true;
+  };
+  const removeCustomProgression = (value: string) => {
+    dispatch({ type: 'harmony-custom', values: state.customProgressions.filter(p => p !== value), config: { ...state.harmonyConfig, progressions: POP_PROGRESSIONS.some(p => p.degrees === value) ? state.harmonyConfig.progressions : state.harmonyConfig.progressions.filter(p => p !== value) } });
+  };
 
   const setFretRange = useCallback((range: FretRange) => {
     cancelScheduledQuestion();
@@ -863,6 +969,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
   const fretHighlights = useMemo(() => {
     const question = state.question;
     if (!question) return [];
+    if (question.harmony) return state.harmonyReady && state.harmonyPreview
+      ? getFingeringPositions(triadFingering(state.harmonyPreview)).map(position => ({ position, tone: 'chord' as const })) : [];
     if (state.practiceType === 'same-pitch-matching') {
       return [
         ...(question.candidatePositions ?? []).map(position => ({ position, tone: 'prompt' as const })),
@@ -909,6 +1017,8 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     }
     return [];
   }, [
+    state.harmonyPreview,
+    state.harmonyReady,
     state.question,
     state.feedback,
     state.correctAnswer,
@@ -963,7 +1073,18 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
 
   return {
     ...state,
+    beginHarmony,
+    submitHarmony,
+    setHarmonyConfig: (config: HarmonyConfig) => dispatch({ type: 'harmony-config', config }),
+    editHarmonyConfig: () => { canSubmitRef.current = false; dispatch({ type: 'harmony-edit-config' }); },
+    selectHarmonyAnswer: (patch: Partial<HarmonyAnswer>) => dispatch({ type: 'harmony-select', patch }),
+    focusHarmonyAnswer: (index: number) => dispatch({ type: 'harmony-focus', index }),
+    previewHarmony: (chord: Triad, index: number, source: 'answer' | 'correct' | 'sequence') => dispatch({ type: 'harmony-preview', chord, index, source }),
+    addCustomProgression,
+    removeCustomProgression,
     summary,
+    mutedStrings: state.harmonyReady && state.question?.harmony && state.harmonyPreview
+      ? triadFingering(state.harmonyPreview).frets.flatMap((fret, string) => fret === null ? [string as StringIndex] : []) : [],
     fretHighlights,
     highlightedPositions,
     playbackMidiNotes,

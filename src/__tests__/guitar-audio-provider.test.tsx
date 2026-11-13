@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuitarAudioProvider } from '../components/GuitarAudioProvider';
 import { useGuitarAudio } from '../hooks/useGuitarAudio';
 
@@ -52,7 +52,16 @@ function SequenceHarness() {
   );
 }
 
+const chordSteps = vi.fn();
+const chordComplete = vi.fn();
+function ChordSequenceHarness() {
+  const { status, playChordSequence, stopSequence } = useGuitarAudio();
+  if (status !== 'ready') return <p>loading</p>;
+  return <><button type="button" onClick={() => playChordSequence([[60, 64, 67], [62, 65, 69]], { onStep: chordSteps, onComplete: chordComplete })}>chord-sequence</button><button type="button" onClick={stopSequence}>stop-chords</button></>;
+}
+
 describe('GuitarAudioProvider', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     mocks.instrument.mockReset();
@@ -98,6 +107,36 @@ describe('GuitarAudioProvider', () => {
       </GuitarAudioProvider>
     );
     expect(screen.getByRole('button', { name: 'browse-loading' })).toBeInTheDocument();
+  });
+
+  it('synchronizes chord sequence steps and cancels future chords and completion', async () => {
+    vi.useFakeTimers(); chordSteps.mockClear(); chordComplete.mockClear();
+    render(<GuitarAudioProvider volume={0.5}><ChordSequenceHarness /></GuitarAudioProvider>);
+    await act(async () => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'chord-sequence' }));
+    await act(async () => { vi.advanceTimersByTime(0); await Promise.resolve(); });
+    expect(chordSteps).toHaveBeenLastCalledWith(0);
+    expect(mocks.play).toHaveBeenCalledTimes(3);
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(chordSteps).toHaveBeenLastCalledWith(1);
+    expect(mocks.play).toHaveBeenCalledTimes(6);
+    fireEvent.click(screen.getByRole('button', { name: 'stop-chords' }));
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(chordComplete).not.toHaveBeenCalled();
+    expect(mocks.stop).toHaveBeenCalled();
+  });
+
+  it('does not play a cancelled chord after AudioContext finishes resuming', async () => {
+    vi.useFakeTimers();
+    render(<GuitarAudioProvider volume={0.5}><ChordSequenceHarness /></GuitarAudioProvider>);
+    await act(async () => undefined);
+    let resume!: () => void;
+    FakeAudioContext.latest!.resume.mockImplementationOnce(() => new Promise<void>(resolve => { resume = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'chord-sequence' }));
+    await act(async () => vi.advanceTimersByTime(0));
+    fireEvent.click(screen.getByRole('button', { name: 'stop-chords' }));
+    await act(async () => { resume(); await Promise.resolve(); });
+    expect(mocks.play).not.toHaveBeenCalled();
   });
 
   it('plays a sequence in order and cancels pending notes', async () => {

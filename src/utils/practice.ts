@@ -1,3 +1,5 @@
+import { DEFAULT_HARMONY_CONFIG, generateHarmonyQuestion } from './harmony';
+import type { HarmonyConfig, HarmonyQuestion } from './harmony';
 import type { NoteName } from './note';
 import { midiToChromaticName, midiToNoteName, NOTE_NAMES } from './note';
 import type { Chord, ChordCurriculum, ChordFingering, FretboardPosition, StringIndex } from './chord';
@@ -22,7 +24,9 @@ export type PracticeType =
   | 'reference-pitch-to-position'
   | 'interval-identification'
   | 'chord-quality'
-  | 'major-scale-pattern-note-name';
+  | 'major-scale-pattern-note-name'
+  | 'chord-degree'
+  | 'chord-progression';
 
 export type PitchDirection = 'higher' | 'same' | 'lower';
 export type IntervalId =
@@ -58,6 +62,8 @@ export const FRET_RANGES: Record<FretRange, { min: number; max: number }> = {
 };
 
 export const PRACTICE_TYPE_NAMES: Record<PracticeType, string> = {
+  'chord-degree': '和弦级数',
+  'chord-progression': '流行走向',
   'note-to-name-and-position': '听音高 → 音名 + 指板位置',
   'position-to-name': '指板亮点 → 音名',
   'note-name-to-all-positions': '音名 → 全部指板位置',
@@ -102,6 +108,7 @@ export const ADVANCED_INTERVALS: IntervalId[] = [
 ];
 
 export interface PracticeQuestion {
+  harmony?: HarmonyQuestion;
   id: number;
   type: PracticeType;
   midiNote?: number;
@@ -396,9 +403,13 @@ export function generateQuestion(
   intervalCurriculum: IntervalCurriculum = 'beginner',
   samePitchCurriculum: SamePitchCurriculum = 'beginner',
   majorKey: MajorKey = 'C',
-  scalePatternId: MajorScalePatternId = 'mi'
+  scalePatternId: MajorScalePatternId = 'mi',
+  harmonyConfig: HarmonyConfig = DEFAULT_HARMONY_CONFIG
 ): PracticeQuestion {
   switch (type) {
+    case 'chord-degree':
+    case 'chord-progression':
+      return { id: ++questionIdCounter, type, harmony: generateHarmonyQuestion(harmonyConfig, type === 'chord-progression') };
     case 'note-to-name-and-position':
     case 'position-to-name':
       return generateNoteQuestion(type, tuning, fretRange);

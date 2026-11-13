@@ -21,6 +21,7 @@ function Harness({
       retry: vi.fn(),
       playNote: vi.fn(),
       playChord: vi.fn(),
+      playChordSequence: vi.fn(),
       playSequence: vi.fn(),
       stopSequence: vi.fn()
     }}>

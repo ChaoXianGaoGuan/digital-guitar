@@ -10,8 +10,9 @@ interface FretCellProps {
   variant: 'open' | 'fretted';
   showNoteName: boolean;
   noteDisplayMode: 'natural' | 'octave';
+  isMuted?: boolean;
   isHighlighted?: boolean;
-  highlightTone?: 'selected' | 'prompt' | 'correct' | 'area';
+  highlightTone?: 'selected' | 'prompt' | 'correct' | 'area' | 'chord';
   showClickFeedback?: boolean;
   style?: CSSProperties;
   onClick: (click: FretClick) => void;
@@ -23,6 +24,7 @@ export function FretCell({
   variant,
   showNoteName,
   noteDisplayMode,
+  isMuted = false,
   isHighlighted = false,
   highlightTone = 'selected',
   showClickFeedback = true,
@@ -65,6 +67,7 @@ export function FretCell({
       data-midi={midi}
       aria-label={`${6 - position.string}弦 ${positionLabel} ${noteName}`}
     >
+      {isMuted && <span className="fret-muted" aria-label="闷弦">×</span>}
       {variant === 'open' && <span className="open-string-line" />}
       {showNoteName && <span className="note-name">{noteName}</span>}
       {showDot && <span className={`red-dot ${isHighlighted ? `dot-${highlightTone}` : 'dot-played'}`} />}

@@ -2,11 +2,15 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuitarAudioProvider } from '../components/GuitarAudioProvider';
 import { useGuitarAudio } from '../hooks/useGuitarAudio';
+import { usePractice } from '../hooks/usePractice';
+import { PracticeMode } from '../components/PracticeMode';
+import { STANDARD_TUNING } from '../utils/tuning';
 
 const mocks = vi.hoisted(() => ({
   instrument: vi.fn(),
   play: vi.fn(),
-  stop: vi.fn()
+  stop: vi.fn(),
+  voiceStop: vi.fn()
 }));
 
 vi.mock('soundfont-player', () => ({
@@ -60,13 +64,21 @@ function ChordSequenceHarness() {
   return <><button type="button" onClick={() => playChordSequence([[60, 64, 67], [62, 65, 69]], { onStep: chordSteps, onComplete: chordComplete })}>chord-sequence</button><button type="button" onClick={stopSequence}>stop-chords</button></>;
 }
 
+function HarmonyHarness() {
+  const { status } = useGuitarAudio();
+  const practice = usePractice();
+  return <PracticeMode tuning={STANDARD_TUNING} audioStatus={status} practice={practice} onStop={vi.fn()} />;
+}
+
 describe('GuitarAudioProvider', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
   beforeEach(() => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     mocks.instrument.mockReset();
     mocks.play.mockReset();
     mocks.stop.mockReset();
+    mocks.voiceStop.mockReset();
+    mocks.play.mockImplementation(() => ({ stop: mocks.voiceStop }));
     mocks.instrument.mockResolvedValue({ play: mocks.play, stop: mocks.stop });
   });
 
@@ -123,7 +135,34 @@ describe('GuitarAudioProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'stop-chords' }));
     await act(async () => vi.advanceTimersByTime(2000));
     expect(chordComplete).not.toHaveBeenCalled();
-    expect(mocks.stop).toHaveBeenCalled();
+    expect(mocks.voiceStop).toHaveBeenCalledTimes(6);
+    expect(mocks.stop).not.toHaveBeenCalled();
+  });
+
+  it.each(['和弦级数', '流行走向'])('preserves the preview chord through submission and automatic advancement in %s', async type => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    localStorage.clear();
+    render(<GuitarAudioProvider volume={0.5}><HarmonyHarness /></GuitarAudioProvider>);
+    await act(async () => undefined);
+    fireEvent.click(screen.getByRole('button', { name: type }));
+    fireEvent.click(screen.getByRole('button', { name: /开始练习/ }));
+    const roots = type === '和弦级数' ? ['C'] : ['C', 'A', 'F', 'G'];
+    for (const [i, root] of roots.entries()) {
+      if (type === '流行走向') fireEvent.click(screen.getByRole('button', { name: new RegExp(`^第 ${i + 1} 格`) }));
+      fireEvent.click(screen.getByRole('button', { name: `根音 ${root}` }));
+      fireEvent.click(screen.getByRole('button', { name: i === 1 ? /^小三/ : /^大三/ }));
+      await act(async () => undefined);
+    }
+    expect(mocks.play).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '提交答案' }));
+    expect(mocks.voiceStop).not.toHaveBeenCalled();
+    expect(mocks.stop).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(screen.queryByRole('button', { name: '提交答案' })).not.toBeInTheDocument();
+    expect(mocks.voiceStop).not.toHaveBeenCalled();
+    expect(mocks.stop).not.toHaveBeenCalled();
+    expect(mocks.play.mock.lastCall?.[2]).toMatchObject({ duration: 0.8 });
   });
 
   it('does not play a cancelled chord after AudioContext finishes resuming', async () => {

@@ -464,7 +464,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
           : currentQuestion.type
     );
     dispatch({ type: 'submit-result', isCorrect, answer });
-    if (isCorrect && !isHarmonyType(currentQuestion.type)) scheduleNextQuestion();
+    if (isCorrect) scheduleNextQuestion();
   }, [recordAnswer, scheduleNextQuestion, state.intervalCurriculum, state.samePitchCurriculum]);
 
   const beginHarmony = () => {
@@ -1076,7 +1076,7 @@ export function usePractice(tuning: Tuning = STANDARD_TUNING) {
     beginHarmony,
     submitHarmony,
     setHarmonyConfig: (config: HarmonyConfig) => dispatch({ type: 'harmony-config', config }),
-    editHarmonyConfig: () => { canSubmitRef.current = false; dispatch({ type: 'harmony-edit-config' }); },
+    editHarmonyConfig: () => { cancelScheduledQuestion(); canSubmitRef.current = false; dispatch({ type: 'harmony-edit-config' }); },
     selectHarmonyAnswer: (patch: Partial<HarmonyAnswer>) => dispatch({ type: 'harmony-select', patch }),
     focusHarmonyAnswer: (index: number) => dispatch({ type: 'harmony-focus', index }),
     previewHarmony: (chord: Triad, index: number, source: 'answer' | 'correct' | 'sequence') => dispatch({ type: 'harmony-preview', chord, index, source }),

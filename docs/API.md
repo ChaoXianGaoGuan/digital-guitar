@@ -708,7 +708,7 @@ interface UseSettingsReturn {
 
 `PracticeType` 增加 `chord-degree`、`chord-progression`，`PracticeQuestion.harmony?: HarmonyQuestion` 保存对应音乐数据。`generateQuestion()` 增加可选末尾参数 `harmonyConfig`，原调用兼容。
 
-`usePractice` 提供 `setHarmonyConfig`、`beginHarmony`、`editHarmonyConfig`、`selectHarmonyAnswer`、`focusHarmonyAnswer`、`previewHarmony`、`submitHarmony`、`addCustomProgression`、`removeCustomProgression`。答案及反馈由 reducer 管理，提交后锁定计分，正确结果也不自动切题。摘要使用 `${type}:${key}` 的掌握度键，保持原摘要和自定义走向存储键兼容。
+`usePractice` 提供 `setHarmonyConfig`、`beginHarmony`、`editHarmonyConfig`、`selectHarmonyAnswer`、`focusHarmonyAnswer`、`previewHarmony`、`submitHarmony`、`addCustomProgression`、`removeCustomProgression`。答案及反馈由 reducer 管理，提交后锁定计分，答对 500ms 后自动切题、答错手动切题。摘要使用 `${type}:${key}` 的掌握度键，保持原摘要和自定义走向存储键兼容。
 
 `HighlightTone` 增加 `chord`，用于红色真实指法；`Fretboard.mutedStrings?: StringIndex[]` 显示闷弦标记。
 
@@ -716,4 +716,4 @@ interface UseSettingsReturn {
 
 `playChordSequence(chords: number[][], options?: ChordSequenceOptions): void`。
 
-`ChordSequenceOptions` 包含 `chordDurationMs`（默认 800）、`gapMs`（默认 200）、`onStep(index)` 和 `onComplete()`。`stopSequence()` 停止当前发声、清除后续音符／和弦与完成回调，并阻止等待 AudioContext 恢复的旧播放继续发声。新的序列开始前自动取消旧序列。
+`ChordSequenceOptions` 包含 `chordDurationMs`（默认 800）、`gapMs`（默认 200）、`onStep(index)` 和 `onComplete()`。`stopSequence()` 只停止当前序列所属的声音、清除后续音符／和弦与完成回调，并阻止等待 AudioContext 恢复的旧序列继续发声；独立的单音或和弦试听会自然结束，不因提交或自动切题被截断。新的序列开始前自动取消旧序列。

@@ -3,8 +3,12 @@ import type { PropsWithChildren } from 'react';
 import { GuitarAudioContext } from '../context/guitarAudioContext';
 import type { ChordSequenceOptions, GuitarAudioStatus } from '../context/guitarAudioContext';
 
+interface SoundfontVoice {
+  stop: () => unknown;
+}
+
 interface SoundfontInstrument {
-  play: (note: string, when?: number, options?: { duration?: number; gain?: number }) => unknown;
+  play: (note: string, when?: number, options?: { duration?: number; gain?: number }) => SoundfontVoice | undefined;
   stop: () => unknown;
 }
 
@@ -40,12 +44,15 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
   const instrumentRef = useRef<SoundfontInstrument | null>(null);
   const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const sequenceVersionRef = useRef(0);
+  const sequenceVoicesRef = useRef(new Set<SoundfontVoice>());
 
   const stopSequence = useCallback(() => {
     sequenceVersionRef.current += 1;
     sequenceTimersRef.current.forEach(timer => clearTimeout(timer));
     sequenceTimersRef.current = [];
-    instrumentRef.current?.stop();
+    // Cancel scheduled playback without cutting off independently played notes/chords.
+    sequenceVoicesRef.current.forEach(voice => voice.stop());
+    sequenceVoicesRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -105,11 +112,13 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
           await context.resume();
         }
 
+        if (context !== audioContextRef.current || instrument !== instrumentRef.current) return;
         if (version !== undefined && version !== sequenceVersionRef.current) return;
 
         const when = context.currentTime;
         for (const midi of midiNotes) {
-          instrument.play(midi.toString(), when, { duration, gain: volume * 3 });
+          const voice = instrument.play(midi.toString(), when, { duration, gain: volume * 3 });
+          if (version !== undefined && voice) sequenceVoicesRef.current.add(voice);
         }
       } catch {
         // Browsers can reject resume() until the next user gesture.
@@ -120,11 +129,11 @@ export function GuitarAudioProvider({ children, volume }: GuitarAudioProviderPro
   }, [volume]);
 
   const playNote = useCallback((midi: number) => {
-    playNotes([midi], 0.5, sequenceVersionRef.current);
+    playNotes([midi], 0.5);
   }, [playNotes]);
 
   const playChord = useCallback((midiNotes: number[]) => {
-    playNotes(midiNotes, 0.8, sequenceVersionRef.current);
+    playNotes(midiNotes, 0.8);
   }, [playNotes]);
 
   const playSequence = useCallback((

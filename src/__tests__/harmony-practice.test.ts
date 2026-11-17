@@ -9,7 +9,7 @@ describe('harmony practice controller', () => {
   beforeEach(() => { localStorage.clear(); vi.spyOn(Math, 'random').mockReturnValue(0); });
   afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
-  it('counts once, keeps correct feedback until manual next, and derives red points and mutes', () => {
+  it('counts once, automatically advances correct answers, and derives red points and mutes', () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => usePractice());
     act(() => result.current.startPractice('chord-degree'));
@@ -25,14 +25,16 @@ describe('harmony practice controller', () => {
     act(() => { result.current.submitHarmony(); result.current.submitHarmony(); });
     expect(result.current.stats).toEqual({ total: 1, correct: 1 });
     expect(result.current.summary.recentResults['chord-degree:C']).toEqual([true]);
-    act(() => vi.advanceTimersByTime(2000));
+    act(() => vi.advanceTimersByTime(499));
     expect(result.current.question!.id).toBe(id);
-    act(() => result.current.nextQuestion());
+    act(() => vi.advanceTimersByTime(1));
+    expect(result.current.question!.id).not.toBe(id);
     expect(result.current.harmonyPreview).toBeNull();
     expect(result.current.feedback).toBe('none');
   });
 
-  it('rejects partial submissions and scores the full progression', () => {
+  it('rejects partial submissions and keeps wrong progressions until manual next', () => {
+    vi.useFakeTimers();
     const { result } = renderHook(() => usePractice());
     act(() => result.current.startPractice('chord-progression'));
     act(() => result.current.beginHarmony());
@@ -50,6 +52,49 @@ describe('harmony practice controller', () => {
     const answers = result.current.harmonyAnswers;
     act(() => result.current.selectHarmonyAnswer({ root: 9 }));
     expect(result.current.harmonyAnswers).toBe(answers);
+    const id = result.current.question!.id;
+    act(() => vi.advanceTimersByTime(3000));
+    expect(result.current.question!.id).toBe(id);
+    act(() => result.current.nextQuestion());
+    expect(result.current.question!.id).not.toBe(id);
+    expect(result.current.feedback).toBe('none');
+  });
+
+  it.each(['chord-degree', 'chord-progression'] as const)('automatically advances fully correct %s answers', type => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePractice());
+    act(() => result.current.startPractice(type));
+    act(() => result.current.beginHarmony());
+    result.current.question!.harmony!.chords.forEach((chord, index) => {
+      act(() => result.current.focusHarmonyAnswer(index));
+      act(() => result.current.selectHarmonyAnswer(chord));
+    });
+    const id = result.current.question!.id;
+    act(() => result.current.submitHarmony());
+    expect(result.current.feedback).toBe('correct');
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current.question!.id).not.toBe(id);
+    expect(result.current.harmonyAnswers.every(a => a.root === null && a.quality === null)).toBe(true);
+    expect(result.current.stats).toEqual({ total: 1, correct: 1 });
+  });
+
+  it.each(['settings', 'switch', 'stop', 'unmount'])('cancels pending harmony advancement on %s', action => {
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => usePractice());
+    act(() => result.current.startPractice('chord-degree'));
+    act(() => result.current.beginHarmony());
+    act(() => result.current.selectHarmonyAnswer({ root: 0, quality: 'major' }));
+    act(() => result.current.submitHarmony());
+    act(() => {
+      if (action === 'settings') result.current.editHarmonyConfig();
+      if (action === 'switch') result.current.startPractice('position-to-name');
+      if (action === 'stop') result.current.stopPractice();
+      if (action === 'unmount') unmount();
+    });
+    const id = result.current.question?.id;
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current.question?.id).toBe(id);
+    if (action === 'settings') expect(result.current.harmonyReady).toBe(false);
   });
 
   it('persists custom progressions, removes them, and prevents empty configuration', () => {

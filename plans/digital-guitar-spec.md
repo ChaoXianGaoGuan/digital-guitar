@@ -172,4 +172,4 @@ type ChordType = 'major' | 'minor' | 'dominant7';
 
 ## 和弦级数与流行走向扩展
 
-新增两种练习，统一放在和弦训练分类中，共用当前指板、音频 Provider、练习 reducer 与学习摘要。完整行为、默认配置与题库来源见 [和弦训练规格](harmony-training-spec.md)。此扩展的手动提交、手动切题规则优先于上文通用的答对自动切题规则。
+新增两种练习，统一放在和弦训练分类中，共用当前指板、音频 Provider、练习 reducer 与学习摘要。完整行为、默认配置与题库来源见 [和弦训练规格](harmony-training-spec.md)。此扩展的手动提交规则及答对自动切题、答错手动切题行为见扩展规格。

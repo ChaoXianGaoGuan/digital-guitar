@@ -63,7 +63,7 @@ function DigitalGuitarApp({ settings, updateSettings, setTuning }: DigitalGuitar
         </div>
       )}
 
-      <main>
+      <main className={isPracticeMode && isHarmonyType(practice.practiceType) ? "harmony-layout" : undefined}>
         {isPracticeMode && (
           <PracticeMode
             tuning={settings.tuning}
